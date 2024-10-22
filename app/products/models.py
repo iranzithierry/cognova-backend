@@ -3,6 +3,7 @@ from sqlalchemy import String, DECIMAL, Text, TIMESTAMP
 from datetime import datetime
 from database import CognovaEntity
 
+
 class Product(CognovaEntity):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
@@ -14,4 +15,4 @@ class Product(CognovaEntity):
     @staticmethod
     async def get_all_products():
         products = await Product.get_all()
-        return products 
+        return products

@@ -3,7 +3,9 @@ from fastapi.responses import JSONResponse
 from exceptions import CognovaError
 
 
-async def cognova_exception_handler(request: Request, exc: CognovaError) -> JSONResponse:
+async def cognova_exception_handler(
+    request: Request, exc: CognovaError
+) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": type(exc).__name__, "detail": exc.message},

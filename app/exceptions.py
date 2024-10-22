@@ -1,4 +1,3 @@
-
 class CognovaError(Exception):
     def __init__(
         self,

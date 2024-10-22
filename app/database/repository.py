@@ -8,11 +8,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Self, TypeVar, Type
 
-T = TypeVar('T', bound='Repository')
+T = TypeVar("T", bound="Repository")
+
 
 class DatabaseQueryOrder(Enum):
     ASC = "asc"
     DESC = "desc"
+
 
 @dataclass
 class JoinExpression:
@@ -26,13 +28,15 @@ class Repository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, ongoing_transaction=False, return_created_model=False) -> Optional[Self]:
+    async def create(
+        self, ongoing_transaction=False, return_created_model=False
+    ) -> Optional[Self]:
         self.db.add(self)
         if not ongoing_transaction:
             await self.db.commit()
         if return_created_model:
             await self.db.refresh(self)
-            return self 
+            return self
 
     async def delete(self, ongoing_transaction=False):
         await self.db.delete(self)
@@ -57,7 +61,9 @@ class Repository:
         filters = filters or []
         load_relationships = load_relationships or []
         eager_load_relationships = eager_load_relationships or []
-        model_instances_to_select = with_polymorphic(model_cls, "*") if polymorphic else model_cls
+        model_instances_to_select = (
+            with_polymorphic(model_cls, "*") if polymorphic else model_cls
+        )
         stmt = (
             select(model_instances_to_select)
             .where(*filters)
@@ -79,7 +85,7 @@ class Repository:
                     stmt = stmt.join(j.model, j.condition, isouter=j.outer)
         return stmt
 
-    @classmethod 
+    @classmethod
     async def get_all(
         cls: Type[T],
         polymorphic: bool = False,
@@ -105,7 +111,7 @@ class Repository:
         selected_model_instances = await model.db.execute(stmt)
         return selected_model_instances.unique().scalars().all()
 
-    @classmethod 
+    @classmethod
     async def get_one(
         cls: Type[T],
         polymorphic: bool = False,
@@ -124,22 +130,26 @@ class Repository:
         )
         selected_model_instance = await model.db.execute(stmt)
         return selected_model_instance.scalars().first()
-    
+
     @classmethod
-    async def create_many(cls: Type[T], attributes_list: list[dict], ongoing_transaction=False):
+    async def create_many(
+        cls: Type[T], attributes_list: list[dict], ongoing_transaction=False
+    ):
         model = cls()
-        model_instances_to_create = [cls(**attributes) for attributes in attributes_list]
+        model_instances_to_create = [
+            cls(**attributes) for attributes in attributes_list
+        ]
         model.db.bulk_save_objects(model_instances_to_create)
         if not ongoing_transaction:
             await model.db.commit()
 
     @classmethod
-    async def create_or_update(cls: Type[T], filters: list[BinaryExpression], **attributes):
+    async def create_or_update(
+        cls: Type[T], filters: list[BinaryExpression], **attributes
+    ):
         selected_model_instance = cls.get_one(filters=filters)
         if selected_model_instance:
             await selected_model_instance.update(**attributes)
         else:
             model_instance_to_create = cls(**attributes)
             await model_instance_to_create.create()
-
-    
