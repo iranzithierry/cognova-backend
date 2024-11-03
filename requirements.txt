@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+langchain
+openai
+trafilatura
+sqlalchemy
+prisma
+python-dotenv
+html2text
+markdownify
+json
+faiss
+numpy
+pydantic
+langchain_community
+psycopg2
+Levenshtein
