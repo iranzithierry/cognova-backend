@@ -134,7 +134,7 @@ class EmbeddingService:
         """Build the search query with hybrid semantic and text search"""
         where_conditions = [
             "v.\"sourceId\" = ANY(%s)",
-            "1 - (v.embedding <-> %s::vector) > 0.000000001",  # Similarity threshold
+            "1 - (v.embedding <-> %s::vector) > 0.009",  # Similarity threshold
             "to_tsvector('english', v.\"chunkContent\") @@ plainto_tsquery('english', %s)"
         ]
         
