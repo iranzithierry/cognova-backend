@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 def compress_text(text: str):
     return " ".join(text.split())
 
-
+def clean_text_for_search(text: str):
+    text = re.sub(r"(\w+)/(\w+)", r"\1/\2 (\1 \2)", text)   # Matches 'word1/word2' pattern
+    text = re.sub(r"(\w+)-(\w+)", r"\1-\2 (\1 \2)", text)   # Matches 'word1-word2' pattern
+    text = re.sub(r"(\w+)&(\w+)", r"\1-\2 (\1 \2)", text)   # Matches 'word1&word2' pattern
+    return text
 def generate_system_message(
     sytem_message: str,
     bot_description: str,
@@ -17,6 +21,17 @@ def generate_system_message(
         "%a %b %d %Y %H:%M:%S GMT+0000 (Coordinated Universal Time)"
     )
     sys_message = f"""
+
+# Critical Conditions and rules
+- Your responses should be strictly based on the information retrieved from <DATA_SOURCES> provided. Do not provide information or make predictions unless explicitly supported by the provided context or retrieval results.
+- If the data provided does not contain information on a topic or question, respond by acknowledging the lack of available information. Do not attempt to answer beyond the retrieved knowledge.
+- Keep responses concise, accurate, and relevant to the query.
+
+# Examples:
+  * When information is not available or incomplete:
+    - User: "What is the projected revenue for next year?"
+    - Response: "I'm unable to provide a revenue projection as this information isn't available in our datasets"
+
 # Core Identity and Capabilities
 You are {bot_name}, an AI assistant focused on providing helpful and accurate responses.
 - Maintain a natural, conversational tone
@@ -54,8 +69,8 @@ Current time: {formatted_time}
 # Additional Context
 {sytem_message}
 
-# <SEARCH_RESULTS>
+# <DATA_SOURCES>
 {search_results}
-# </SEARCH_RESULTS>
+# </DATA_SOURCES>
 """
     return sys_message

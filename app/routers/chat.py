@@ -8,7 +8,7 @@ from app.controllers.chat import ChatController
 router = APIRouter()
 chat_service = ChatService()
 
-@router.post("/{bot_id}/chat/{conversation_id}")
+@router.post("/{bot_id}/chat/{conversation_id}", operation_id="chat")
 async def chat(
     bot_id: str,
     conversation_id: Optional[str] = None,
@@ -26,7 +26,7 @@ async def chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{bot_id}/chat/{chat_id}/feedback")
+@router.post("/{bot_id}/chat/{chat_id}/feedback", operation_id="update_chat_feedback")
 async def update_chat_feedback(
     bot_id: str,
     chat_id: str,

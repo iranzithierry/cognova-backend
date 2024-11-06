@@ -45,12 +45,13 @@ class WebSourcesController:
     def generate_web_sources_embeddings(self) -> None:
         """Generate and store embeddings for web sources"""
         for source_id, url in zip(self.sources_ids, self.scrapped_urls):
-            chunks, embeddings = self.embedding_service.create_embeddings(url["content"])
+            chunks, embeddings, contexts = self.embedding_service.create_embeddings(url["content"])
             self.embedding_service.store_web_source_embeddings(
                 workspace_id=self.workspace_id,
                 source_id=source_id,
                 chunks=chunks,
                 embeddings=embeddings,
+                chunk_contexts=contexts,
                 metadata=url["metadata"]
             )
     # async def sync(self, source_id: str):

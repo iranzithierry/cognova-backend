@@ -22,7 +22,7 @@ class ChatController():
         for source in results:
             search_results += f"""
             ```
-            - accuracy: {source.combined_score}
+            - accuracy: {source.semantic_similarity}
             - title: {source.metadata["title"]}
             - description: {source.metadata["description"]} 
             - url: {source.metadata["source"]}

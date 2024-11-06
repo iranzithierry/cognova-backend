@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+import datetime as base_datetime
 from app.models import Vector
 from typing import List, Tuple, Any
 from app.db import Database, DatabaseError
@@ -12,9 +14,9 @@ class VectorRepository:
         query = """
         INSERT INTO vectors (
             id, "workspaceId", "sourceId", embedding, "chunkContent",
-            metadata, "chunkLength", "updatedAt"
+            metadata, "chunkLength", "createdAt", "updatedAt"
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         vector_tuples = [
             (
@@ -25,6 +27,7 @@ class VectorRepository:
                 vector.chunk_content,
                 json.dumps(vector.metadata),
                 vector.chunk_length,
+                datetime.now(base_datetime.timezone.utc), # For delay and knowing which inserted first
                 vector.updated_at
             )
             for vector in vectors

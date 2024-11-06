@@ -75,7 +75,7 @@ class WebScraper:
                 md = MarkdownifyTransformer()
                 urls_content = md.transform_documents(html_content)
             else:
-                ht = Html2TextTransformer(ignore_links=False, ignore_images=False)
+                ht = Html2TextTransformer()
                 urls_content = ht.transform_documents(html_content)
 
             for url in urls_content:

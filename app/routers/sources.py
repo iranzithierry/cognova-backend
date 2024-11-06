@@ -10,7 +10,7 @@ router = APIRouter()
 DEFAULT_WORKSPACE_ID = "c85f9a6e-1c0a-417f-b472-af714b6fab90"
 DEFAULT_TECHNIQUE_ID = "ef0da8d0-eb02-485a-9700-532c36a64790"
 
-@router.get("/scrape/urls")
+@router.get("/scrape/urls", operation_id="scrape_urls")
 async def scrape_urls(url: str):
     try:
         webscraper = WebScraper(scrapper_path="./bin/scrapper")
@@ -23,7 +23,7 @@ async def scrape_urls(url: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/add")
+@router.post("/add", operation_id="add_source")
 async def add_source(source_type: Literal["website"], urls: list[str]):
     try:
         if source_type == "website":
@@ -39,7 +39,7 @@ async def add_source(source_type: Literal["website"], urls: list[str]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/search/{workspace_id}/semantic")
+@router.get("/search/{workspace_id}/semantic", operation_id="semantic_search")
 async def semantic_search(workspace_id: str, prompt: str, top_k: int = 5):
     try:
         source_ids = get_sources_repo().get_source_ids_of_workspace(workspace_id)

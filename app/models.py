@@ -108,6 +108,4 @@ class SearchResult:
     chunk_content: str
     metadata: Metadata
     semantic_similarity: float
-    text_similarity: float
-    combined_score: float
     created_at: datetime
