@@ -27,9 +27,11 @@ class WebSourcesController:
         self.webscraper = WebScraper(scrapper_path="./bin/scrapper")
         self.sources_service = SourcesService()
         self.embedding_service = EmbeddingService()
+        self.bot_id = None
 
-    def start_scrapping(self, urls: List[str]) -> None:
+    def start_scrapping(self, urls: List[str], bot_id: None) -> None:
         """Start the scrapping process for given URLs"""
+        self.bot_id = bot_id
         self.scrapped_urls = self.webscraper.scrape(urls)
         self.create_web_sources()
         self.generate_web_sources_embeddings()
@@ -41,6 +43,8 @@ class WebSourcesController:
             workspace_id=self.workspace_id,
             technique_id=self.technique_id,
         )
+        if self.bot_id:
+            self.source_repo.associate_sources_to_bot(self.bot_id, self.sources_ids)
 
     def generate_web_sources_embeddings(self) -> None:
         """Generate and store embeddings for web sources"""

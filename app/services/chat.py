@@ -27,18 +27,17 @@ class ChatService:
     ) -> List[Dict[str, str]]:
         messages = []
 
-        if bot.system_message:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": generate_system_message(
-                        sytem_message=bot.system_message,
-                        bot_description=bot.description,
-                        bot_name=bot.name,
-                        search_results=search_results,
-                    ),
-                }
-            )
+        messages.append(
+            {
+                "role": "system",
+                "content": generate_system_message(
+                    system_message=bot.system_message if bot.system_message else None,
+                    bot_description=bot.description,
+                    bot_name=bot.name,
+                    search_results=search_results,
+                ),
+            }
+        )
 
         messages.extend(
             [
@@ -91,7 +90,7 @@ class ChatService:
 
             messages = self.prepare_chat_context(bot, history, search_results)
             chat_provider = CloudflareProvider(
-                self.config, self.client, bot.model_slug
+                self.config, self.client, bot.model_name
             )
 
             assistant_message = ""
@@ -141,18 +140,3 @@ class ChatService:
             yield f"data: {json.dumps({'error': error_message})}\n\n"
             if user_message:
                 self.chat_repo.delete_chat(str(user_message.id))
-
-    async def update_feedback(self, chat_id: str, feedback: FeedbackType) -> Chat:
-        """Update chat message feedback"""
-        try:
-            updated_chat = self.chat_repo.update_chat_feedback(chat_id, feedback)
-            return updated_chat
-        except Exception as e:
-            raise ValueError(f"Failed to update feedback: {str(e)}")
-
-    async def get_message_sources(self, chat_id: str) -> List[str]:
-        """Get source URLs for a chat message"""
-        try:
-            return self.chat_repo.get_chat_sources(chat_id)
-        except Exception as e:
-            raise ValueError(f"Failed to get message sources: {str(e)}")

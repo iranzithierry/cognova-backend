@@ -1,5 +1,6 @@
-from typing import List, Tuple
-from app.models import Source, UUID
+from uuid import uuid4
+from typing import List, Tuple, Optional
+from app.models import Source, UUID, Technique
 from app.db import Database, DatabaseError
 
 
@@ -49,6 +50,17 @@ class SourceRepository:
             return [row[0] for row in results]
         except Exception as e:
             raise DatabaseError(f"Failed to get source ids for bot: {str(e)}")
+    
+    def associate_sources_to_bot(self, bot_id: str, source_ids: List[str]):
+        """Associate sources to a bot"""
+        query = """
+        INSERT INTO bot_sources (id, "botId", "sourceId") VALUES (%s, %s, %s)
+        """
+        bot_source_tuples = [(str(uuid4()), bot_id, source_id) for source_id in source_ids]
+        try:
+            self.db.executemany(query, bot_source_tuples)
+        except Exception as e:
+            raise DatabaseError(f"Failed to associate sources to bot: {str(e)}")
 
     def get_source_ids_of_workspace(self, workspace_id: str):
         """Get source ids by given workspace ids"""
@@ -72,6 +84,16 @@ class SourceRepository:
         except Exception as e:
             raise DatabaseError(f"Failed to get sources: {str(e)}")
 
+    def get_technique(self, technique_name: str) -> Optional[Technique]:
+        query = """
+            SELECT * FROM techniques WHERE name = %s
+        """
+        try:
+            result = self.db.execute(query, (technique_name,), fetch=True)
+            return self._map_to_techniques(result[0]) if result else None
+        except Exception as e:
+            raise DatabaseError(f"Failed to get bot: {str(e)}")
+
     @staticmethod
     def _map_to_sources(row: Tuple) -> Source:
         return Source(
@@ -87,4 +109,15 @@ class SourceRepository:
             sync_time=row[9],
             created_at=row[10],
             updated_at=row[11],
+        )
+
+    @staticmethod
+    def _map_to_techniques(row: Tuple) -> Technique:
+        return Technique(
+            id=row[0],
+            name=row[1],
+            display_name=row[2],
+            plan_id=row[3],
+            createdAt=row[4],
+            updatedAt=row[5],
         )

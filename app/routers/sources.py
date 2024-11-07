@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException
 from app.techniques.webscrapper import WebScraper
 from app.services.embeddings import EmbeddingService
@@ -23,19 +23,22 @@ async def scrape_urls(url: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/add", operation_id="add_source")
-async def add_source(source_type: Literal["website"], urls: list[str]):
+@router.post("/{workspace_id}/add", operation_id="add_source")
+async def add_source(technique_type: Literal["website"], urls: list[str], workspace_id: str, bot_id: Optional[str] = None):
     try:
-        if source_type == "website":
+        technique = get_sources_repo().get_technique(technique_type)
+        if technique and technique_type == "website":
             web_source_controller = WebSourcesController(
-                workspace_id=DEFAULT_WORKSPACE_ID,
-                technique_id=DEFAULT_TECHNIQUE_ID,
+                workspace_id=workspace_id,
+                technique_id=technique.id,
                 config=get_config(),
                 source_repo=get_sources_repo(),
                 vector_repo=get_vector_repo()
             )
-            web_source_controller.start_scrapping(urls)
-        return {"status": "success", "message": "Sources and embeddings added successfully"}
+            web_source_controller.start_scrapping(urls, bot_id)
+            return {"status": "success", "message": "Sources and embeddings added successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Technique not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

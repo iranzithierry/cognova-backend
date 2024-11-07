@@ -73,7 +73,7 @@ class ChatRepository:
 
     def get_bot(self, bot_id: str) -> Optional[Bot]:
         query = """
-        SELECT b.*, m."slugName" as model_slug
+        SELECT b.*, m."name" as model_name
         FROM bots b
         LEFT JOIN models m ON b."modelId" = m.id
         WHERE b.id = %s
@@ -93,53 +93,20 @@ class ChatRepository:
             self.db.execute(query, (chat_id,), fetch=False)
         except Exception as e:
             raise DatabaseError(f"Failed to delete chat: {str(e)}")
-        
-    def update_chat_feedback(self, chat_id: str, feedback_type: FeedbackType) -> Chat:
-            """Update feedback for a chat message"""
-            query = """
-            UPDATE chats 
-            SET feedback = %s, 
-                "updatedAt" = %s 
-            WHERE id = %s 
-            RETURNING *
-            """
-            try:
-                result = self.db.execute(
-                    query, 
-                    (feedback_type.value, datetime.now(base_datetime.timezone.utc), chat_id), 
-                    fetch=True
-                )
-                if not result:
-                    raise DatabaseError(f"Chat not found with id: {chat_id}")
-                return self._map_to_chat(result[0])
-            except Exception as e:
-                raise DatabaseError(f"Failed to update chat feedback: {str(e)}")
-            
-    def get_chat_sources(self, chat_id: str) -> List[str]:
-        """Retrieve source URLs for a chat message"""
-        query = """
-        SELECT "sourceURLs" 
-        FROM chats 
-        WHERE id = %s
-        """
-        try:
-            result = self.db.execute(query, (chat_id,), fetch=True)
-            return result[0][0] if result else []
-        except Exception as e:
-            raise DatabaseError(f"Failed to get chat sources: {str(e)}") 
               
     @staticmethod
     def _map_to_conversation(row: Tuple) -> Conversation:
         return Conversation(
             id=row[0],
             bot_id=row[1],
-            browser=row[2],
-            os=row[3],
-            device=row[4],
-            country_code=row[5],
-            generated_category=row[6],
-            created_at=row[7],
-            updated_at=row[8]
+            session_id=row[2],
+            browser=row[3],
+            os=row[4],
+            device=row[5],
+            country_code=row[6],
+            generated_category=row[7],
+            created_at=row[8],
+            updated_at=row[9]
         )
 
     @staticmethod
@@ -150,7 +117,7 @@ class ChatRepository:
             role=row[2],
             content=row[3],
             tokens=row[4],
-            feedback=FeedbackType(row[5] if row[5] else "none"),
+            feedback=FeedbackType(row[5] if row[5] else FeedbackType.NONE.value),
             source_urls=row[6] or [],
             created_at=row[7],
             updated_at=row[8]
@@ -169,7 +136,7 @@ class ChatRepository:
             welcome_message=row[7],
             starter_questions=row[8],
             model_id=row[9],
-            model_slug=row[12],
+            model_name=row[12],
             created_at=row[10],
             updated_at=row[11]
         )

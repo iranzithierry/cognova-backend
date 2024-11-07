@@ -6,9 +6,9 @@ from typing import List, Optional, Dict, Any
 
 
 class FeedbackType(Enum):
-    UPVOTE = "upvoted"
-    DOWNVOTE = "downvoted"
-    NONE = "none"
+    UPVOTE = "UPVOTED"
+    DOWNVOTE = "DOWNVOTED"
+    NONE = "NONE"
 
 @dataclass
 class Bot:
@@ -21,8 +21,8 @@ class Bot:
     placeholder_message: Optional[str]
     welcome_message: Optional[str]
     starter_questions: List[str]
-    model_id: str
-    model_slug: Optional[str]
+    model_id: Optional[str]
+    model_name: Optional[str] # For chatting
     created_at: datetime
     updated_at: datetime
 
@@ -42,6 +42,7 @@ class Chat:
 class Conversation:
     id: UUID
     bot_id: UUID
+    session_id: str
     browser: Optional[str]
     os: Optional[str]
     device: Optional[str]
@@ -109,3 +110,12 @@ class SearchResult:
     metadata: Metadata
     semantic_similarity: float
     created_at: datetime
+    
+@dataclass
+class Technique:
+    id: UUID
+    name: str
+    display_name: str
+    plan_id: str
+    createdAt: datetime
+    updatedAt: datetime

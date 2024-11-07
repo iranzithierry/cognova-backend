@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from app.config import Config
 from app.models import Source
 from typing import List, Dict, Any
 from app.dependencies import get_config, get_sources_repo
