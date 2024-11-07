@@ -8,8 +8,7 @@ prisma
 python-dotenv
 html2text
 markdownify
-json
-faiss
+faiss-cpu
 numpy
 pydantic
 langchain_community

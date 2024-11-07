@@ -64,13 +64,12 @@ class ChatService:
         conversation_id: str,
         prompt: str,
         search_results: str = None,
-        source_urls: list[str] = []
+        source_urls: list[str] = [],
     ) -> AsyncGenerator[str, None]:
         try:
             bot = self.chat_repo.get_bot(bot_id)
             if not bot:
                 raise ValueError(f"Bot not found with id: {bot_id}")
-
 
             # Save user message
             user_message = Chat(
@@ -89,9 +88,7 @@ class ChatService:
             history = self.chat_repo.get_chat_history(conversation_id)
 
             messages = self.prepare_chat_context(bot, history, search_results)
-            chat_provider = CloudflareProvider(
-                self.config, self.client, bot.model_name
-            )
+            chat_provider = CloudflareProvider(self.config, self.client, bot.model_name)
 
             assistant_message = ""
 
@@ -126,15 +123,10 @@ class ChatService:
                 saved_chat = self.chat_repo.save_chat_message(assistant_chat)
 
             # Send final message with sources
-            yield f"data: {json.dumps({
-                'complete': True, 
-                'source_urls': source_urls, 
-                'chat_id': str(saved_chat.id)})}\n\n"
-            
-            yield f"data: {json.dumps({
-                'question_suggestions': [], 
-                'chat_id': str(saved_chat.id)})}\n\n"
-            
+            yield f"data: {json.dumps({ 'complete': True,  'source_urls': source_urls,  'chat_id': str(saved_chat.id)})}\n\n"
+
+            yield f"data: {json.dumps({ 'question_suggestions': [],  'chat_id': str(saved_chat.id)})}\n\n"
+
         except Exception as e:
             error_message = f"Error processing chat: {str(e)}"
             yield f"data: {json.dumps({'error': error_message})}\n\n"
