@@ -1,10 +1,19 @@
 {
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "axios": "^1.7.7",
-    "express": "^4.21.1"
+  "name": "whatsapp-echo-webhook",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start:listen": "node ./whatsapp/listen.js"
   },
+  "author": "WhatsApp Team",
+  "license": "MIT",
   "dependencies": {
-    "whatsapp": "^0.0.5-Alpha"
-  }
+    "axios": "^1.6.7",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": []
 }

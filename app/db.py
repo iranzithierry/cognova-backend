@@ -13,12 +13,13 @@ class DatabaseError(Exception):
 class ConnectionPool:
     def __init__(self, config: Config):
         self.pool = SimpleConnectionPool(
-            minconn=1,
-            maxconn=10,
-            dbname=config.DB_NAME,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            host=config.DB_HOST,
+            1, # Min Conn
+            10, # Max Conn,
+            config.DB_URL
+            # dbname=config.DB_NAME,
+            # user=config.DB_USER,
+            # password=config.DB_PASSWORD,
+            # host=config.DB_HOST,
         )
 
     @contextmanager
