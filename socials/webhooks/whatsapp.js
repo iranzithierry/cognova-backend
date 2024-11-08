@@ -4,46 +4,132 @@ import axios from "axios";
 const app = express();
 app.use(express.json());
 
-const PORT = "3000"
+const PORT = "3000";
 const WEBHOOK_VERIFY_TOKEN = "npMCtinGPRFwc523ahbSgEH16MVDLSSc"
-const GRAPH_API_TOKEN = "EAAPlrYitZCvIBOwQZByZCOtgiMRm3BJhUXmsPBgaIWpY2ZBioQHozGVWGnfGo7OeOFoEkcQ2fqtyZB7LoSHK3or7YBnkmYKmiEylBbJhptroekaXMnYZCCpcRSAIb5ZC2qaSgZAEGSkyDnTZC5eZB0SPbYLWZCZAZBgbSONZBM4RpZCDHurcIVr2fA3XWxV346SdcwT9ZAzAj7bdikapTmkwXALKyScuLSAbSbiU"
+const GRAPH_API_TOKEN = "EAAPlrYitZCvIBO1S3oA3RtCKkO6d6dgfbBzKEchs4WOmdM6TPkkddTZBe5Pbm3O13dZAOCyup7qBmi69iczDZAiCIpFJjgqZA9CKrf9P2rqPCPwllxIZCqa5NmnvWOwYrOAD79ifPDoqR6GGhgP3ZCsTiV69tpA0MsmkiI4ZAVYFcfttYZCM28omUEin8vR36fY1YcimgQQlZCkQyczPCZBKxSE3M8c4MYZD"
+
+const AI_API_BASE_URL = "https://api.cognova.io/api/v1/bots";
+
+// Dummy data for conversation tracking
+const DUMMY_BOT_ID = "d9c3a43b-78ae-4d48-a5e4-44baa8e8253b";
+const DUMMY_CONVERSATION_IDS = ["96d2cc0c-0c99-4336-bcfe-aebfddbc4bf8", "48d5af1a-9efb-4479-a479-e7e7173f1d76", "965a8770-b072-4f54-a8ec-791c3c7007b0", "f7c7bf78-0a34-436c-9809-dc7a7fc20ce8"];
+const userConversations = new Map();
+
+// Helper function to get or create user conversation
+function getOrCreateUserConversation(phoneNumber) {
+    console.log("Getting or creating user conversation for", phoneNumber);
+    if (!userConversations.has(phoneNumber)) {
+        const randomConversationId = DUMMY_CONVERSATION_IDS[
+            Math.floor(Math.random() * DUMMY_CONVERSATION_IDS.length)
+        ];
+        userConversations.set(phoneNumber, randomConversationId);
+    }
+    return userConversations.get(phoneNumber);
+}
+
+// Function to send WhatsApp message
+async function sendWhatsAppMessage(phoneNumberId, to, text, replyToMessageId) {
+    console.log("Sending message to", to, text);
+    const messageData = {
+        messaging_product: "whatsapp",
+        to,
+        text: { body: text },
+        ...(replyToMessageId && {
+            context: {
+                message_id: replyToMessageId,
+            },
+        }),
+    };
+
+    await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        headers: {
+            Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+        },
+        data: messageData,
+    });
+}
+
+// Function to mark message as read
+async function markMessageAsRead(phoneNumberId, messageId) {
+    console.log("Marking message as read", messageId);
+    await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        headers: {
+            Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+        },
+        data: {
+            messaging_product: "whatsapp",
+            status: "read",
+            message_id: messageId,
+        },
+    });
+}
+
+// Function to process AI response stream
+const streamChat = async (reader) => {
+    let fullContent = "";
+    const decoder = new TextDecoder();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                const data = JSON.parse(line.slice(5));
+                if ("token" in data) {
+                    fullContent += data.token;
+                }
+            }
+        }
+    }
+    return fullContent;
+};
 
 app.post("/webhook", async (req, res) => {
-    const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
+    try {
+        const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
+        console.log("Received a message", message)
 
-    if (message?.type === "text") {
-        const business_phone_number_id = req.body.entry?.[0].changes?.[0].value?.metadata?.phone_number_id;
-        await axios({
-            method: "POST",
-            url: `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
-            headers: {
-                Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-            },
-            data: {
-                messaging_product: "whatsapp",
-                to: message.from,
-                text: { body: "Echo: " + message.text.body },
-                context: {
-                    message_id: message.id, // shows the message as a reply to the original user message
+        if (message?.type === "text") {
+            const business_phone_number_id = req.body.entry?.[0].changes?.[0].value?.metadata?.phone_number_id;
+
+            // Mark message as read first
+            await markMessageAsRead(business_phone_number_id, message.id);
+
+            // Get or create conversation ID for this user
+            const conversationId = getOrCreateUserConversation(message.from);
+
+            // Call AI API
+            const aiResponse = await fetch(`${AI_API_BASE_URL}/${DUMMY_BOT_ID}/chat/${conversationId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "text/event-stream",
                 },
-            },
-        });
+                body: JSON.stringify({ prompt: message.text.body, }),
+            });
+    
+            const reader = aiResponse.body?.getReader();
+            const aiMessageText = await streamChat(reader);
 
-        await axios({
-            method: "POST",
-            url: `https://graph.facebook.com/v18.0/${business_phone_number_id}/messages`,
-            headers: {
-                Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-            },
-            data: {
-                messaging_product: "whatsapp",
-                status: "read",
-                message_id: message.id,
-            },
-        });
+            await sendWhatsAppMessage(
+                business_phone_number_id,
+                message.from,
+                aiMessageText,
+                message.id
+            );
+        }
+
+        res.sendStatus(200);
+    } catch (error) {
+        console.error('Error processing webhook:', error.message);
+        res.sendStatus(500);
     }
-
-    res.sendStatus(200);
 });
 
 app.get("/webhook", (req, res) => {
@@ -66,3 +152,4 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is listening on port: ${PORT}`);
 });
+// pm2 start node -- listen.j
