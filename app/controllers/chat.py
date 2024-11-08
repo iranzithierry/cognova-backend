@@ -4,7 +4,7 @@ from app.dependencies import get_sources_repo
 from app.services.embeddings import EmbeddingService
 
 
-class ChatController():
+class ChatController:
     def __init__(self):
         self.chat_service = ChatService()
         pass
@@ -13,21 +13,24 @@ class ChatController():
         source_ids = get_sources_repo().get_source_ids_of_bot(bot_id=bot_id)
         embedding_service = EmbeddingService()
         results = embedding_service.search_embeddings(
-            query_text=prompt,
-            source_ids=source_ids,
-            top_k=5
+            query_text=prompt, source_ids=source_ids, top_k=5
         )
-        source_urls = [source.metadata["source"] for source in results]
+        source_urls = [
+            source.metadata["source"] if "source" in source.metadata else None
+            for source in results
+        ]
         search_results = ""
         for source in results:
             search_results += f"""
             ```
             - accuracy: {source.semantic_similarity}
-            - title: {source.metadata["title"]}
-            - description: {source.metadata["description"]} 
-            - url: {source.metadata["source"]}
+            - title: {source.metadata["title"] if "title" in source.metadata else None}
+            - description: {source.metadata["description"]  if "description" in source.metadata else None} 
+            - url: {source.metadata["source"] if "source" in source.metadata else None}
             - text: {source.chunk_content}
             ```
             """
-        
-        return self.chat_service.handle_chat(bot_id, conversation_id, prompt, search_results, source_urls)
+        print("Got Source URLs: ", source_urls)
+        return self.chat_service.handle_chat(
+            bot_id, conversation_id, prompt, search_results, source_urls
+        )

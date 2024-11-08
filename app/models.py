@@ -86,10 +86,10 @@ class Source:
 
 @dataclass
 class Metadata:
-    title: str
-    source: str
-    language: str
-    description: str
+    title: Optional[str] = None
+    source: Optional[str] = None
+    language: Optional[str] = None
+    description: Optional[str] = None
 
 @dataclass
 class Vector:

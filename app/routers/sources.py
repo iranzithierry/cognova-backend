@@ -58,4 +58,5 @@ async def semantic_search(workspace_id: str, prompt: str, top_k: int = 5):
             "data": results,
         }
     except Exception as e:
+        print("Semantic search error:", e)
         raise HTTPException(status_code=500, detail=str(e))

@@ -24,4 +24,5 @@ async def chat(
         )
         return StreamingResponse(response, media_type="text/event-stream")
     except Exception as e:
+        print("Chat error:", e)
         raise HTTPException(status_code=500, detail=str(e))
