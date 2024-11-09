@@ -152,4 +152,4 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is listening on port: ${PORT}`);
 });
-// pm2 start node -- listen.j
+// pm2 start node -- app.js
