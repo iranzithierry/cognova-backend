@@ -38,7 +38,7 @@ class CloudflareProvider(ChatProvider):
             completion_params = {
                 "model": self.model,
                 "messages": messages,
-                "stream": True,
+                "stream": False,
             }
             print("Chat provider completion params", completion_params)
 
