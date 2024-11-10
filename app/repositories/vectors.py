@@ -27,7 +27,7 @@ class VectorRepository:
                 vector.chunk_content,
                 json.dumps(vector.metadata),
                 vector.chunk_length,
-                datetime.now(base_datetime.timezone.utc),
+                datetime.now(base_datetime.timezone.utc), # For delay and knowing which inserted first
                 vector.updated_at
             )
             for vector in vectors
@@ -45,33 +45,7 @@ class VectorRepository:
     ) -> List[Tuple]:
         """Execute semantic search query"""
         try:
-            # Validate inputs
-            if not query or not query.strip():
-                return []
-            
-            if not params or not isinstance(params, list):
-                return []
-            
-            # Execute query with proper error handling
-            try:
-                results = self.db.execute(query, params, fetch=True)
-                
-                # Validate results
-                if results is None:
-                    return []
-                    
-                # Ensure results is a list of tuples
-                if isinstance(results, (list, tuple)):
-                    return list(results)  # Convert generator to list if needed
-                else:
-                    return []
-                    
-            except Exception as e:
-                # Log the specific database error
-                print(f"Database execution error: {str(e)}")
-                raise DatabaseError(f"Database query execution failed: {str(e)}")
-                
+            results =  self.db.execute(query, params, fetch=True)
+            return results
         except Exception as e:
-            # Catch any other unexpected errors
-            print(f"Unexpected error in execute_search: {str(e)}")
             raise DatabaseError(f"Search query failed: {str(e)}")
