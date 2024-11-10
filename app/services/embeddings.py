@@ -259,8 +259,10 @@ class EmbeddingService:
             try:
                 with open("./data/symbols.txt") as f:
                     symbols = f.read().splitlines()
+                    f.close()
                 with open("./data/stopwords.txt") as f:
                     stopwords = f.read().splitlines()
+                    f.close()
             except FileNotFoundError as e:
                 raise ValueError(f"Required data files not found: {str(e)}")
 

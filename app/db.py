@@ -79,6 +79,8 @@ class Database:
     @contextmanager
     def transaction(self) -> Generator[cursor, Any, None]:
         """Context manager for database transactions with automatic rollback on error"""
+        conn = None
+        cur = None
         for attempt in range(self.max_retries):
             try:
                 with self.pool.get_connection() as conn:
@@ -93,19 +95,29 @@ class Database:
                             raise DatabaseError(f"Transaction failed: {str(e)}") from e
                         continue
                     finally:
-                        cur.close()
+                        if cur and not cur.closed:
+                            cur.close()
             except DatabaseError:
                 if attempt == self.max_retries - 1:
                     raise
                 continue
+            
 
     def execute(self, query: str, params: Optional[Tuple] = None, fetch: bool = False) -> Optional[List[Tuple]]:
         """Execute a single query with parameters"""
-        with self.transaction() as cur:
-            cur.execute(query, params)
-            return cur.fetchall() if fetch else None
-
+        try:
+            with self.transaction() as cur:
+                cur.execute(query, params)
+                return cur.fetchall() if fetch else None
+        except Exception as e:
+            logger.error(f"Database execution error: {str(e)}")
+            raise DatabaseError(f"Query execution failed: {str(e)}")
+        
     def executemany(self, query: str, params_list: List[Tuple]) -> None:
         """Execute multiple queries with parameters"""
-        with self.transaction() as cur:
-            cur.executemany(query, params_list)
+        try:
+            with self.transaction() as cur:
+                cur.executemany(query, params_list)
+        except Exception as e:
+            logger.error(f"Database execution error: {str(e)}")
+            raise DatabaseError(f"Query execution failed: {str(e)}")
