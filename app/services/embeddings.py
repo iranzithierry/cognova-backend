@@ -246,49 +246,76 @@ class EmbeddingService:
         get_vector_repo().create_vectors(vectors)
     
     def search_embeddings(
-            self,
-            query_text: str,
-            source_ids: List[str],
-            top_k: int = 5,
-            max_age_days: Optional[int] = None,
-            content_types: Optional[List[str]] = None,
-        ) -> List[SearchResult]:
-            """Enhanced semantic search with better deduplication and relevance filtering"""
+        self,
+        query_text: str,
+        source_ids: List[str],
+        top_k: int = 5,
+        max_age_days: Optional[int] = None,
+        content_types: Optional[List[str]] = None,
+    ) -> List[SearchResult]:
+        """Enhanced semantic search with better deduplication and relevance filtering"""
+        try:
+            # 1. File handling with error checking
             try:
-                not_allowed_chars = []
-                symbols = open("./data/symbols.txt").read().split("\n")
-                stopwords = open("./data/stopwords.txt").read().split("\n")
-                not_allowed_chars.extend(symbols)
-                not_allowed_chars.extend(stopwords)
-                filtered_words = [word for word in query_text.split() if word.lower() not in not_allowed_chars]
-                query_text = " ".join(filtered_words)
-                _, [query_embedding] = self.create_embeddings(query_text, batch=False)[:2]
+                with open("./data/symbols.txt") as f:
+                    symbols = f.read().splitlines()
+                with open("./data/stopwords.txt") as f:
+                    stopwords = f.read().splitlines()
+            except FileNotFoundError as e:
+                raise ValueError(f"Required data files not found: {str(e)}")
+
+            not_allowed_chars = symbols + stopwords
+
+            if not query_text or not query_text.strip():
+                return []
+
+            filtered_words = [word for word in query_text.split() if word.lower() not in not_allowed_chars]
+            if not filtered_words:
+                return []
+            
+            processed_query = " ".join(filtered_words)
+            
+            embedding_result = self.create_embeddings(processed_query, batch=False)
+            if not embedding_result or len(embedding_result) < 2:
+                raise ValueError("Failed to create embeddings")
+            
+            _, query_embedding = embedding_result[:2]
+            if query_embedding is None:
+                raise ValueError("Query embedding is None")
+
+            search_query = self._build_search_query(
+                max_age_days=max_age_days,
+                content_types=content_types
+            )
+            
+            params = [
+                query_embedding,
+                query_embedding,
+                source_ids
+            ]
+            
+            if max_age_days is not None:
+                params.append(str(max_age_days))
+            
+            if content_types:
+                params.append(content_types)
                 
-                search_query = self._build_search_query(
-                    max_age_days=max_age_days,
-                    content_types=content_types
-                )
-                
-                # Add query embedding twice for both similarity calculations
-                params = [
-                    query_embedding,  # For main similarity calculation
-                    query_embedding,  # For ranking
-                    source_ids,
-                    *([str(max_age_days)] if max_age_days is not None else []),
-                    *([content_types] if content_types else []),
-                    top_k
-                ]
-                
-                results = get_vector_repo().execute_search(
-                    query=search_query,
-                    params=params
-                )
-                
-                if not results:
-                    return []
-                
-                search_results = []
-                for row in results:
+            params.append(top_k)
+
+            results = get_vector_repo().execute_search(
+                query=search_query,
+                params=params
+            )
+            
+            if not results:
+                return []
+
+            search_results = []
+            for row in results:
+                if len(row) < 5:  # Ensure row has all required elements
+                    continue
+                    
+                try:
                     search_results.append(
                         SearchResult(
                             source_id=uuid.UUID(row[0]),
@@ -298,8 +325,10 @@ class EmbeddingService:
                             created_at=row[3]
                         )
                     )
-                
-                return search_results[:top_k]
+                except (ValueError, IndexError, TypeError) as e:
+                    continue
 
-            except Exception as e:
-                raise ValueError(f"Search failed: {str(e)}")
+            return search_results[:top_k]
+
+        except Exception as e:
+            raise ValueError(f"Search failed: {str(e)}")
