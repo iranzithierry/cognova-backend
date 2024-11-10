@@ -1,6 +1,7 @@
 import re
 from typing import List, Dict, Any
-from app.prompting import PromptGenerator
+from app.prompts.default import DefaultPromptGenerator
+from app.prompts.seller import SellerPromptGenerator
 
 
 def compress_text(text: str):
@@ -25,13 +26,22 @@ def generate_system_message(
     bot_description: str,
     bot_name: str,
     search_results: str,
+    prompt_type: str = None,
 ) -> str:
     """
     Backwards-compatible wrapper for the new implementation.
     """
-    generator = PromptGenerator(
-        bot_name=bot_name,
-        bot_description=bot_description,
-        system_message=system_message,
-    )
-    return generator.generate_message(search_results)
+    if prompt_type == "default" or prompt_type is None:
+        generator = DefaultPromptGenerator(
+            bot_name=bot_name,
+            bot_description=bot_description,
+            system_message=system_message,
+        )
+        return generator.generate_message(search_results)
+    # elif prompt_type == "seller":
+    #     generator = SellerPromptGenerator(
+    #         bot_name=bot_name,
+    #         bot_description=bot_description,
+    #         system_message=system_message,
+    #     )
+    # return generator.generate_message(search_results)
