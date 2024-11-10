@@ -47,10 +47,12 @@ class CloudflareProvider(ChatProvider):
             completion = self.client.with_options(max_retries=1, timeout=60*2).chat.completions.create(**completion_params)
 
             async for response in self.stream(completion):
+                print("Chat provider response", response)
                 yield response
 
         except Exception as e:
             error_msg = f"Chat completion failed: {str(e)}"
+            print(error_msg)
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
             raise StreamProcessingError(error_msg)
 
@@ -111,6 +113,7 @@ class CloudflareProvider(ChatProvider):
             )
 
         except Exception as e:
+            print("tool processing error", e)
             raise ToolProcessingError(f"Failed to process tool call: {str(e)}")
 
     def make_tool_object(self, tool_call: ToolCall) -> Dict[str, Any]:
