@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 import datetime as base_datetime
+from app.logger import logger
 from app.models import Vector
 from typing import List, Tuple, Any
 from app.db import Database, DatabaseError
@@ -38,40 +39,36 @@ class VectorRepository:
         except Exception as e:
             raise DatabaseError(f"Failed to create vectors: {str(e)}")
         
+class VectorRepository:
+    def __init__(self, db: Database):
+        self.db = db
+
     def execute_search(
         self,
         query: str,
         params: List[Any]
     ) -> List[Tuple]:
-        """Execute semantic search query"""
+        """Execute semantic search query with proper error handling"""
         try:
-            # Validate inputs
+            # Input validation
             if not query or not query.strip():
                 return []
             
             if not params or not isinstance(params, list):
                 return []
+
+            # Execute query and immediately convert results to list
+            results = self.db.execute(query, params, fetch=True)
             
-            # Execute query with proper error handling
-            try:
-                results = self.db.execute(query, params, fetch=True)
+            # Handle None results
+            if results is None:
+                return []
                 
-                # Validate results
-                if results is None:
-                    return []
-                    
-                # Ensure results is a list of tuples
-                if isinstance(results, (list, tuple)):
-                    return list(results)  # Convert generator to list if needed
-                else:
-                    return []
-                    
-            except Exception as e:
-                # Log the specific database error
-                print(f"Database execution error: {str(e)}")
-                raise DatabaseError(f"Database query execution failed: {str(e)}")
-                
+            return results
+
+        except DatabaseError as e:
+            logger.error(f"Database search error: {str(e)}")
+            raise DatabaseError(f"Search query failed: {str(e)}")
         except Exception as e:
-            # Catch any other unexpected errors
-            print(f"Unexpected error in execute_search: {str(e)}")
+            logger.error(f"Unexpected error in execute_search: {str(e)}")
             raise DatabaseError(f"Search query failed: {str(e)}")

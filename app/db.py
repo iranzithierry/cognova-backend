@@ -79,6 +79,8 @@ class Database:
     @contextmanager
     def transaction(self) -> Generator[cursor, Any, None]:
         """Context manager for database transactions with automatic rollback on error"""
+        conn = None
+        cur = None
         for attempt in range(self.max_retries):
             try:
                 with self.pool.get_connection() as conn:
@@ -88,22 +90,32 @@ class Database:
                         conn.commit()
                         return
                     except Exception as e:
-                        conn.rollback()
+                        if cur and not cur.closed:
+                            conn.rollback()
                         if attempt == self.max_retries - 1:
                             raise DatabaseError(f"Transaction failed: {str(e)}") from e
                         continue
                     finally:
-                        cur.close()
+                        if cur and not cur.closed:
+                            cur.close()
             except DatabaseError:
                 if attempt == self.max_retries - 1:
                     raise
                 continue
 
-    def execute(self, query: str, params: Optional[Tuple] = None, fetch: bool = False) -> Optional[List[Tuple]]:
-        """Execute a single query with parameters"""
-        with self.transaction() as cur:
-            cur.execute(query, params)
-            return cur.fetchall() if fetch else None
+    def execute(self, query: str, params: Optional[List[Any]] = None, fetch: bool = False) -> Optional[List[Tuple]]:
+        """Execute a single query with parameters and proper cursor handling"""
+        try:
+            with self.transaction() as cur:
+                cur.execute(query, params)
+                if fetch:
+                    # Immediately fetch all results and convert to list
+                    results = list(cur.fetchall()) if cur.description else []
+                    return results
+                return None
+        except Exception as e:
+            logger.error(f"Database execution error: {str(e)}")
+            raise DatabaseError(f"Query execution failed: {str(e)}")
 
     def executemany(self, query: str, params_list: List[Tuple]) -> None:
         """Execute multiple queries with parameters"""
