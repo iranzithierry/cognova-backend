@@ -84,20 +84,15 @@ class ChatService:
                 updated_at=datetime.now(base_datetime.timezone.utc),
             )
             self.chat_repo.save_chat_message(user_message)
-            print("User Message Saved")
 
             history = self.chat_repo.get_chat_history(conversation_id)
-            print("Chat history retrieved")
 
             messages = self.prepare_chat_context(bot, history, search_results)
-            print("History context prepared")
             chat_provider = CloudflareProvider(self.config, self.client, bot.model_name)
-            print("Initialized chat provider")
 
             assistant_message = ""
 
             async for chunk in chat_provider.request(messages):
-                print("We go chat chunk", end="")
                 yield chunk
                 try:
                     chunk_data = json.loads(chunk.replace("data: ", "").strip())
@@ -109,8 +104,7 @@ class ChatService:
                         )
                         yield f"data: {json.dumps({'token': tool_result})}\n\n"
                         assistant_message += tool_result
-                except json.JSONDecodeError as e:
-                    print("JSON Decode Err", e)
+                except json.JSONDecodeError:
                     continue
 
             # Save assistant message
@@ -128,7 +122,6 @@ class ChatService:
                     updated_at=datetime.now(base_datetime.timezone.utc),
                 )
                 saved_chat = self.chat_repo.save_chat_message(assistant_chat)
-                print("Assistant message saved")
 
             # Send final message with sources
             if saved_chat:
@@ -137,7 +130,6 @@ class ChatService:
 
         except Exception as e:
             error_message = f"Error processing chat: {str(e)}"
-            print(error_message)
             yield f"data: {json.dumps({'error': error_message})}\n\n"
             if user_message:
                 self.chat_repo.delete_chat(str(user_message.id))

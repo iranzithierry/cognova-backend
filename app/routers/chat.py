@@ -22,7 +22,6 @@ async def chat(
             conversation_id=conversation_id,
             prompt=prompt
         )
-        print("Chat Response:", response)
         return StreamingResponse(response, media_type="text/event-stream")
     except Exception as e:
         print("Chat error:", e)
