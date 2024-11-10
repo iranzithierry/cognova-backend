@@ -12,7 +12,6 @@ from app.dependencies import get_vector_repo, get_config
 
 class ChunkContext(NamedTuple):
     """Stores context information about chunk position in document"""
-
     start_position: int
     end_position: int
     section_title: Optional[str]
@@ -25,15 +24,17 @@ class EnhancedSearchResult(SearchResult):
 
 
 class EmbeddingService:
+    MAX_CHUNK_SIZE = 2000
+    
     def __init__(self):
         self.client = OpenAI(
             base_url=get_config().EMBEDDING_BASE_URL,
             api_key=get_config().EMBEDDING_API_KEY,
         )
-        # Increased chunk overlap to capture more context
+        # Using smaller chunk overlap to maximize content coverage
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,  # Increased overlap
+            chunk_size=self.MAX_CHUNK_SIZE,
+            chunk_overlap=50,  # Minimal overlap to ensure context continuity
             separators=[
                 "\n## ",
                 "\n### ",
@@ -42,52 +43,87 @@ class EmbeddingService:
                 ". ",
                 "? ",
                 "! ",
+                " ",  # Added space as final separator to ensure complete splitting
             ],
+            length_function=len,
+            is_separator_regex=False
         )
 
     def create_embeddings(
         self, texts: str, batch: bool = True
     ) -> Tuple[List[str], List[List[float]], List[ChunkContext]]:
-        """Create embeddings with enhanced context tracking"""
+        """Create embeddings ensuring complete text coverage with 2K chunk limit"""
         original_text = texts
-        texts = clean_text_for_search(texts)
-        input_texts = self.text_splitter.split_text(texts) if batch else [texts]
+        cleaned_text = clean_text_for_search(texts)
+        
+        # Split text into chunks, ensuring complete coverage
+        if batch:
+            input_texts = []
+            current_pos = 0
+            remaining_text = cleaned_text
+            
+            while remaining_text:
+                # Get next chunk
+                chunks = self.text_splitter.split_text(remaining_text)
+                if not chunks:
+                    # If splitting failed, force split at MAX_CHUNK_SIZE
+                    chunks = [remaining_text[:self.MAX_CHUNK_SIZE]]
+                    
+                chunk = chunks[0]
+                input_texts.append(chunk)
+                
+                # Move to next section of text
+                chunk_pos = remaining_text.find(chunk) + len(chunk)
+                remaining_text = remaining_text[chunk_pos:]
+        else:
+            input_texts = [cleaned_text[:self.MAX_CHUNK_SIZE]]
 
-        # Track context for each chunk
+        # Create context information for each chunk
         chunk_contexts = []
+        current_pos = 0
+        
         for chunk in input_texts:
-            start_pos = original_text.find(chunk)
-            end_pos = start_pos + len(chunk)
-
+            # Find actual position in original text
+            chunk_start = original_text.find(chunk, current_pos)
+            if chunk_start == -1:  # Fallback if exact match not found
+                chunk_start = current_pos
+            
+            chunk_end = chunk_start + len(chunk)
+            current_pos = chunk_end  # Update position for next iteration
+            
             # Get surrounding context
-            preceding_context = original_text[
-                max(0, start_pos - 200) : start_pos
-            ].strip()
-            following_context = original_text[
-                end_pos : min(len(original_text), end_pos + 200)
-            ].strip()
-
-            # Try to identify section title
-            section_title = self._extract_section_title(original_text, start_pos)
-
+            preceding_context = original_text[max(0, chunk_start - 200):chunk_start].strip()
+            following_context = original_text[chunk_end:min(len(original_text), chunk_end + 200)].strip()
+            
+            # Extract section title
+            section_title = self._extract_section_title(original_text, chunk_start)
+            
             chunk_contexts.append(
                 ChunkContext(
-                    start_position=start_pos,
-                    end_position=end_pos,
+                    start_position=chunk_start,
+                    end_position=chunk_end,
                     section_title=section_title,
                     preceding_context=preceding_context,
                     following_context=following_context,
                 )
             )
 
-        response = self.client.embeddings.create(
-            input=input_texts, model=get_config().EMBEDDING_MODEL, dimensions=1024
-        )
+        # Create embeddings in batches of 100 to handle large documents
+        all_embeddings = []
+        batch_size = 100
+        
+        for i in range(0, len(input_texts), batch_size):
+            batch_texts = input_texts[i:i + batch_size]
+            response = self.client.embeddings.create(
+                input=batch_texts,
+                model=get_config().EMBEDDING_MODEL,
+                dimensions=1024
+            )
+            all_embeddings.extend([data.embedding for data in response.data])
 
-        embeddings = [data.embedding for data in response.data]
         if batch:
-            return input_texts, embeddings, chunk_contexts
-        return [texts], [embeddings[0]], [chunk_contexts[0]]
+            return input_texts, all_embeddings, chunk_contexts
+        return [input_texts[0]], [all_embeddings[0]], [chunk_contexts[0]]
 
     def _extract_section_title(self, text: str, chunk_start: int) -> Optional[str]:
         """Extract the nearest preceding section title"""
@@ -103,6 +139,76 @@ class EmbeddingService:
                 return text_before[last_header_pos:header_end].strip()
         return None
 
+    def _build_search_query(
+            self,
+            max_age_days: Optional[int] = None,
+            content_types: Optional[List[str]] = None
+        ) -> str:
+        """Search query to find relevant chunks"""
+        base_conditions = ["v.\"sourceId\" = ANY(%s)"]
+        
+        if max_age_days is not None:
+            base_conditions.append("s.\"createdAt\" >= NOW() - INTERVAL '%s days'")
+        
+        if content_types:
+            base_conditions.append("s.\"contentType\" = ANY(%s)")
+        
+        return f"""
+        WITH RankedResults AS (
+            SELECT 
+                v."sourceId",
+                v."chunkContent",
+                v.metadata,
+                v."createdAt",
+                1 - (v.embedding <-> %s::vector) AS similarity,
+                ROW_NUMBER() OVER (
+                    PARTITION BY v."sourceId" 
+                    ORDER BY 1 - (v.embedding <-> %s::vector) DESC
+                ) as rank
+            FROM vectors v
+            JOIN sources s ON s.id = v."sourceId"
+            WHERE {' AND '.join(base_conditions)}
+        ),
+        ContextualResults AS (
+            SELECT 
+                r1."sourceId",
+                r1."chunkContent",
+                r1.metadata,
+                r1."createdAt",
+                r1.similarity,
+                ARRAY_AGG(
+                    CASE 
+                        WHEN r2.rank <= 2 AND r2.rank != r1.rank 
+                        THEN r2."chunkContent" 
+                    END
+                ) FILTER (WHERE r2.rank <= 2 AND r2.rank != r1.rank) as context_chunks
+            FROM RankedResults r1
+            LEFT JOIN RankedResults r2 
+            ON r1."sourceId" = r2."sourceId"
+            WHERE r1.rank = 1
+            GROUP BY 
+                r1."sourceId", 
+                r1."chunkContent", 
+                r1.metadata, 
+                r1."createdAt",
+                r1.similarity
+        )
+        SELECT 
+            "sourceId",
+            CASE 
+                WHEN context_chunks IS NOT NULL AND array_length(context_chunks, 1) > 0
+                THEN "chunkContent" || ' ... ' || array_to_string(context_chunks, ' ... ')
+                ELSE "chunkContent"
+            END as full_content,
+            metadata,
+            "createdAt",
+            similarity
+        FROM ContextualResults
+        WHERE similarity > 0.001
+        ORDER BY similarity DESC
+        LIMIT %s;
+        """
+
     def store_web_source_embeddings(
         self,
         workspace_id: str,
@@ -112,7 +218,7 @@ class EmbeddingService:
         chunk_contexts: List[ChunkContext],
         metadata: Dict[str, Any]
     ) -> None:
-        """Store embeddings with flattened context information in metadata"""
+        """Store all chunks with complete context"""
         vectors = []
         for chunk_content, embedding, context in zip(chunks, embeddings, chunk_contexts):
             enhanced_metadata = {
@@ -129,7 +235,7 @@ class EmbeddingService:
                 workspace_id=uuid.UUID(workspace_id),
                 source_id=uuid.UUID(source_id),
                 embedding=embedding,
-                chunk_content=clean_text_for_search(chunk_content),
+                chunk_content=chunk_content,
                 metadata=enhanced_metadata,
                 chunk_length=len(chunk_content),
                 created_at=datetime.now(),
@@ -138,79 +244,7 @@ class EmbeddingService:
             vectors.append(vector)
 
         get_vector_repo().create_vectors(vectors)
-
-    def _build_search_query(
-            self,
-            max_age_days: Optional[int] = None,
-            content_types: Optional[List[str]] = None
-        ) -> str:
-            """Improved search query with better deduplication and relevance threshold"""
-            base_conditions = [
-                "v.\"sourceId\" = ANY(%s)",
-            ]
-            
-            if max_age_days is not None:
-                base_conditions.append("s.\"createdAt\" >= NOW() - INTERVAL '%s days'")
-            
-            if content_types:
-                base_conditions.append("s.\"contentType\" = ANY(%s)")
-            
-            return f"""
-            WITH RankedResults AS (
-                SELECT 
-                    v."sourceId",
-                    v."chunkContent",
-                    v.metadata,
-                    v."createdAt",
-                    1 - (v.embedding <-> %s::vector) AS similarity,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY v."sourceId" 
-                        ORDER BY 1 - (v.embedding <-> %s::vector) DESC
-                    ) as rank
-                FROM vectors v
-                JOIN sources s ON s.id = v."sourceId"
-                WHERE {' AND '.join(base_conditions)}
-            ),
-            ContextualResults AS (
-                SELECT 
-                    r1."sourceId",
-                    r1."chunkContent",
-                    r1.metadata,
-                    r1."createdAt",
-                    r1.similarity,
-                    ARRAY_AGG(
-                        CASE 
-                            WHEN r2.rank <= 2 AND r2.rank != r1.rank 
-                            THEN r2."chunkContent" 
-                        END
-                    ) FILTER (WHERE r2.rank <= 2 AND r2.rank != r1.rank) as context_chunks
-                FROM RankedResults r1
-                LEFT JOIN RankedResults r2 
-                ON r1."sourceId" = r2."sourceId"
-                WHERE r1.rank = 1
-                GROUP BY 
-                    r1."sourceId", 
-                    r1."chunkContent", 
-                    r1.metadata, 
-                    r1."createdAt",
-                    r1.similarity
-            )
-            SELECT 
-                "sourceId",
-                CASE 
-                    WHEN context_chunks IS NOT NULL AND array_length(context_chunks, 1) > 0
-                    THEN "chunkContent" || ' ... ' || array_to_string(context_chunks, ' ... ')
-                    ELSE "chunkContent"
-                END as full_content,
-                metadata,
-                "createdAt",
-                similarity
-            FROM ContextualResults
-            WHERE similarity > 0.001
-            ORDER BY similarity DESC
-            LIMIT %s;
-            """
-
+    
     def search_embeddings(
             self,
             query_text: str,
