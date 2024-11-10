@@ -331,4 +331,4 @@ class EmbeddingService:
             return search_results[:top_k]
 
         except Exception as e:
-            raise ValueError(f"Search failed: {str(e)}")
+            raise ValueError(f"Search embeddings failed: {str(e)}")
