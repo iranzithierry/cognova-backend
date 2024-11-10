@@ -40,12 +40,13 @@ class CloudflareProvider(ChatProvider):
                 "messages": messages,
                 "stream": True,
             }
+            print("Chat provider completion params", completion_params)
 
             if kwargs:
                 completion_params.update(kwargs)
 
             completion = self.client.with_options(max_retries=1, timeout=60*2).chat.completions.create(**completion_params)
-
+            print("Chat provider completion", completion)
             async for response in self.stream(completion):
                 print("Chat provider response", response)
                 yield response
