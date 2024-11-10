@@ -108,6 +108,7 @@ class ChatService:
                     continue
 
             # Save assistant message
+            saved_chat = None
             if assistant_message:
                 assistant_chat = Chat(
                     id=uuid4(),
@@ -123,9 +124,9 @@ class ChatService:
                 saved_chat = self.chat_repo.save_chat_message(assistant_chat)
 
             # Send final message with sources
-            yield f"data: {json.dumps({ 'complete': True,  'source_urls': source_urls,  'chat_id': str(saved_chat.id)})}\n\n"
-
-            yield f"data: {json.dumps({ 'question_suggestions': [],  'chat_id': str(saved_chat.id)})}\n\n"
+            if saved_chat:
+                yield f"data: {json.dumps({ 'complete': True,  'source_urls': source_urls,  'chat_id': str(saved_chat.id)})}\n\n"
+                yield f"data: {json.dumps({ 'question_suggestions': [],  'chat_id': str(saved_chat.id)})}\n\n"
 
         except Exception as e:
             error_message = f"Error processing chat: {str(e)}"
