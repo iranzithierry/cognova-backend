@@ -30,7 +30,6 @@ class ChatController:
             - text: {source.chunk_content}
             ```
             """
-        print("Got Source URLs: ", source_urls)
         return self.chat_service.handle_chat(
             bot_id, conversation_id, prompt, search_results, source_urls
         )

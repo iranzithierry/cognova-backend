@@ -86,7 +86,6 @@ class ChatService:
             self.chat_repo.save_chat_message(user_message)
 
             history = self.chat_repo.get_chat_history(conversation_id)
-
             messages = self.prepare_chat_context(bot, history, search_results)
             chat_provider = CloudflareProvider(self.config, self.client, bot.model_name)
 

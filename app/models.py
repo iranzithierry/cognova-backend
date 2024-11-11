@@ -23,6 +23,7 @@ class Bot:
     starter_questions: List[str]
     model_id: Optional[str]
     model_name: Optional[str] # For chatting
+    businessId: Optional[str]
     created_at: datetime
     updated_at: datetime
 

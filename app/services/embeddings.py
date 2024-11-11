@@ -282,6 +282,7 @@ class EmbeddingService:
                 raise ValueError("Failed to create embeddings")
             
             _, query_embedding = embedding_result[:2]
+            query_embedding = query_embedding[0]
             if query_embedding is None:
                 raise ValueError("Query embedding is None")
 

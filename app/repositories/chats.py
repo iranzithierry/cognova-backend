@@ -135,9 +135,10 @@ class ChatRepository:
             placeholder_message=row[6],
             welcome_message=row[7],
             starter_questions=row[8],
-            model_id=row[9],
-            model_name=row[12],
-            created_at=row[10],
-            updated_at=row[11]
+            created_at=row[9],
+            updated_at=row[10],
+            businessId=[11],
+            model_id=row[12],
+            model_name=row[13],
         )
 
