@@ -45,6 +45,7 @@ class VectorRepository:
     ) -> List[Tuple]:
         """Execute semantic search query"""
         try:
+            print("Query", params)
             results =  self.db.execute(query, params, fetch=True)
             return results
         except Exception as e:
