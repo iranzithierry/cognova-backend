@@ -78,10 +78,10 @@ class ChatService:
                 role="user",
                 content=prompt,
                 tokens=len(prompt.split()),
-                feedback=FeedbackType.NONE.value,
                 source_urls=[],
                 created_at=datetime.now(base_datetime.timezone.utc),
                 updated_at=datetime.now(base_datetime.timezone.utc),
+                feedback=FeedbackType.NONE.value,
             )
             self.chat_repo.save_chat_message(user_message)
 
@@ -115,10 +115,10 @@ class ChatService:
                     role="assistant",
                     content=assistant_message.replace("<|im_end|>", ""),
                     tokens=len(assistant_message.split()),
-                    feedback=FeedbackType.NONE.value,
                     source_urls=source_urls,
                     created_at=datetime.now(base_datetime.timezone.utc),
                     updated_at=datetime.now(base_datetime.timezone.utc),
+                    feedback=FeedbackType.NONE.value,
                 )
                 saved_chat = self.chat_repo.save_chat_message(assistant_chat)
 

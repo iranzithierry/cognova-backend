@@ -34,10 +34,10 @@ class Chat:
     role: str
     content: str
     tokens: int
-    feedback: FeedbackType
     source_urls: List[str]
     created_at: datetime
     updated_at: datetime
+    feedback: FeedbackType
 
 @dataclass
 class Conversation:
