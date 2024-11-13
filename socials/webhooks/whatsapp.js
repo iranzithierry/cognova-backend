@@ -10,14 +10,11 @@ const GRAPH_API_TOKEN = "EAAPlrYitZCvIBO556IjDxqYDd7KtyPKhguWUaB4WaoZAhqk1wCIYIJ
 
 const AI_API_BASE_URL = "https://api.cognova.io/api/v1/bots";
 
-// Dummy data for conversation tracking
 const DUMMY_BOT_ID = "d9c3a43b-78ae-4d48-a5e4-44baa8e8253b";
 const DUMMY_CONVERSATION_IDS = ["96d2cc0c-0c99-4336-bcfe-aebfddbc4bf8", "48d5af1a-9efb-4479-a479-e7e7173f1d76", "965a8770-b072-4f54-a8ec-791c3c7007b0", "f7c7bf78-0a34-436c-9809-dc7a7fc20ce8"];
 const userConversations = new Map();
 
-// Helper function to get or create user conversation
 function getOrCreateUserConversation(phoneNumber) {
-    console.log("Getting or creating user conversation for", phoneNumber);
     if (!userConversations.has(phoneNumber)) {
         const randomConversationId = DUMMY_CONVERSATION_IDS[
             Math.floor(Math.random() * DUMMY_CONVERSATION_IDS.length)
@@ -27,7 +24,6 @@ function getOrCreateUserConversation(phoneNumber) {
     return userConversations.get(phoneNumber);
 }
 
-// Function to send WhatsApp message
 async function sendWhatsAppMessage(phoneNumberId, to, text, replyToMessageId) {
     console.log("Sending message to", to, text);
     const messageData = {
@@ -51,7 +47,6 @@ async function sendWhatsAppMessage(phoneNumberId, to, text, replyToMessageId) {
     });
 }
 
-// Function to mark message as read
 async function markMessageAsRead(phoneNumberId, messageId) {
     console.log("Marking message as read", messageId);
     await axios({
@@ -61,14 +56,13 @@ async function markMessageAsRead(phoneNumberId, messageId) {
             Authorization: `Bearer ${GRAPH_API_TOKEN}`,
         },
         data: {
-            messaging_product: "whatsapp",
             status: "read",
+            messaging_product: "whatsapp",
             message_id: messageId,
         },
     });
 }
 
-// Function to process AI response stream
 const streamChat = async (reader) => {
     let fullContent = "";
     const decoder = new TextDecoder();
@@ -98,13 +92,10 @@ app.post("/webhook", async (req, res) => {
         if (message?.type === "text") {
             const business_phone_number_id = req.body.entry?.[0].changes?.[0].value?.metadata?.phone_number_id;
 
-            // Mark message as read first
             await markMessageAsRead(business_phone_number_id, message.id);
 
-            // Get or create conversation ID for this user
             const conversationId = getOrCreateUserConversation(message.from);
 
-            // Call AI API
             const aiResponse = await fetch(`${AI_API_BASE_URL}/${DUMMY_BOT_ID}/chat/${conversationId}`, {
                 method: "POST",
                 headers: {
