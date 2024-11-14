@@ -1,4 +1,5 @@
 import re
+import os
 import time
 import hashlib
 import subprocess
@@ -32,7 +33,7 @@ def clean_text(content: str, hostname: str) -> str:
 class WebScraper:
     def __init__(
         self,
-        scraper_path: Path = Path("../../bin/scraper"),
+        scraper_path: Path = Path("./bin/scraper"),
         similarity_threshold: float = 0.7
     ):
         """Initialize WebScraper with a cache directory and similarity threshold."""
@@ -116,6 +117,8 @@ class WebScraper:
     def list_links(self, url: str) -> list:
         """List all links found at the URL using external scraper"""
         try:
+            if not url.startswith("https://"):
+                url = f"https://{url}"
             cmd = [self.scraper_path, "list", url, "--limit=6", "--threads=3"]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             

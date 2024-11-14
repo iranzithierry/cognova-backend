@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 
 class BusinessTools:
     def __init__(self):
-        self.prisma = db
+        self.prisma = db.prisma
 
     async def get_business_info(self, business_id: str) -> Dict[str, Any]:
         """Get basic business information."""

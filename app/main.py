@@ -1,11 +1,31 @@
-from prisma import Prisma
+import logging
 from app.core.database import db
-from fastapi import FastAPI, Depends
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi import FastAPI, Depends, HTTPException
 from app.api.routes import chat as chats_router, sources as sources_router
 
-app = FastAPI(title="Cognova API", version="1.0.0", docs_url="/api/v1")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        await db.connect()
+        yield
+    finally:
+        # Shutdown
+        await db.disconnect()
+
+
+app = FastAPI(
+    title="Cognova API",
+    version="1.0.0",
+    docs_url="/api/v1",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,15 +36,27 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-app.include_router(sources_router.router, prefix="/api/v1/sources", tags=["sources"])
-app.include_router(chats_router.router, prefix="/api/v1/bots", tags=["chat"])
+
+async def verify_db():
+    if not await db.verify_connection():
+        try:
+            await db.connect()
+        except Exception as e:
+            logger.error(f"Database connection failed: {str(e)}")
+            raise HTTPException(status_code=503, detail="Database connection error")
+    return db.prisma
 
 
-@app.on_event("startup")
-async def startup():
-    await db.connect()
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db.disconnect()
+# Use the dependency in your routes
+app.include_router(
+    sources_router.router,
+    prefix="/api/v1/sources",
+    tags=["sources"],
+    dependencies=[Depends(verify_db)],
+)
+app.include_router(
+    chats_router.router,
+    prefix="/api/v1/bots",
+    tags=["chat"],
+    dependencies=[Depends(verify_db)],
+)

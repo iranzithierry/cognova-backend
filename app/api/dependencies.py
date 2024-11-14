@@ -12,12 +12,12 @@ def get_config() -> Config:
 
 @lru_cache()
 def get_vector_repo() -> VectorRepository:
-    return VectorRepository(db)
+    return VectorRepository(db.prisma)
 
 @lru_cache()
 def get_sources_repo() -> SourceRepository:
-    return SourceRepository(db)
+    return SourceRepository(db.prisma)
 
 @lru_cache()
 def get_chat_repository() -> ChatRepository:
-    return ChatRepository(db)
+    return ChatRepository(db.prisma)
