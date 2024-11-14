@@ -1,7 +1,8 @@
 prisma generate
-echo "prisma generated"
+echo "Prisma Generated"
 
-sed -i.bak "s/'models\./'/" ./venv/lib/python3.12/site-packages/prisma/models.py
-echo "prisma models updated"
+sed -i.bak "s/'models\./'/" ./venv/lib/python3.*/site-packages/prisma/models.py
+echo "Prisma Models Updated"
 
 chmod +x ./bin/scraper
+echo "Scraper Got Execution Permission"
