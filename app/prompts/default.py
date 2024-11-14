@@ -21,11 +21,11 @@ class DefaultPromptGenerator:
     
     def _generate_core_restrictions(self) -> str:
         """Generate the core knowledge and response restrictions with HARSH rules."""
-        return """
+        return f"""
 # KNOWLEDGE SOURCE RESTRICTIONS
 - Only use information present in <DATA_SOURCES> for responses.
 - Do not reference the origin of the information (e.g., "according to data sources").
-- Speak confidently and directly as if all information comes from innate knowledge.
+- Speak confidently and directly as if all information comes from {self.bot_name}'s own knowledge.
 - Never qualify statements with phrases like "based on" or "according to."
 
 # RESPONSE STYLE
@@ -59,7 +59,7 @@ class DefaultPromptGenerator:
 """
 
     def _generate_identity_section(self) -> str:
-        """Generate the bot identity and capabilities section."""
+        """Generate the bot identity and capabilities section using the provided bot name."""
         return f"""
 # Core Identity and Capabilities
 You are {self.bot_name}, an AI assistant delivering precise and confident responses.
@@ -67,6 +67,7 @@ You are {self.bot_name}, an AI assistant delivering precise and confident respon
 - Concise, confident communication
 - No system information repetition
 - User-centric response focus"""
+
 
     def _generate_security_section(self) -> str:
         """Generate the security guidelines section."""
