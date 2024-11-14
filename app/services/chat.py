@@ -1,16 +1,12 @@
 import json
-from uuid import uuid4
 from openai import OpenAI
-from datetime import datetime
-from app.config import Config
-import datetime as base_datetime
+from prisma.models import Bot, Chat
+from prisma.enums import ChatFeedback
 from app.utils import generate_system_message
 from app.tools.functions import ToolFunctions
-from app.models import Chat, Bot, FeedbackType
-from app.repositories.chats import ChatRepository
-from typing import AsyncGenerator, Dict, Any, List
-from app.providers.chat.cloudflare import CloudflareProvider
-from app.dependencies import get_chat_repository, get_config
+from typing import Dict, List, Any, AsyncGenerator
+from app.api.dependencies import get_chat_repository, get_config
+from app.infrastructure.external.ai_providers.cloudflare import CloudflareProvider
 
 
 class ChatService:
@@ -31,7 +27,7 @@ class ChatService:
             {
                 "role": "system",
                 "content": generate_system_message(
-                    system_message=bot.system_message if bot.system_message else None,
+                    system_message=bot.systemMessage if bot.systemMessage else None,
                     bot_description=bot.description,
                     bot_name=bot.name,
                     search_results=search_results,
@@ -60,38 +56,35 @@ class ChatService:
 
     async def handle_chat(
         self,
-        bot_id: str,
+        bot: Bot,
         conversation_id: str,
         prompt: str,
         search_results: str = None,
         source_urls: list[str] = [],
     ) -> AsyncGenerator[str, None]:
+        
+        user_message = None
         try:
-            bot = self.chat_repo.get_bot(bot_id)
-            if not bot:
-                raise ValueError(f"Bot not found with id: {bot_id}")
-
-            # Save user message
-            user_message = Chat(
-                id=uuid4(),
-                conversation_id=conversation_id,
-                role="user",
-                content=prompt,
-                tokens=len(prompt.split()),
-                source_urls=[],
-                created_at=datetime.now(base_datetime.timezone.utc),
-                updated_at=datetime.now(base_datetime.timezone.utc),
-                feedback=FeedbackType.NONE.value,
+            user_message = await self.chat_repo.save_chat_message(
+                {
+                    "conversationId": conversation_id,
+                    "role": "user",
+                    "content": prompt,
+                    "tokens": len(prompt.split()),
+                    "feedback": ChatFeedback.NONE.value,
+                    "sourceURLs": [],
+                }
             )
-            self.chat_repo.save_chat_message(user_message)
 
-            history = self.chat_repo.get_chat_history(conversation_id)
+            history = await self.chat_repo.get_chats(conversation_id)
             messages = self.prepare_chat_context(bot, history, search_results)
-            chat_provider = CloudflareProvider(self.config, self.client, bot.model_name)
+
+            chat_provider = CloudflareProvider(self.config, self.client, bot.model.name)
 
             assistant_message = ""
 
             async for chunk in chat_provider.request(messages):
+                print("Chunk", chunk)
                 yield chunk
                 try:
                     chunk_data = json.loads(chunk.replace("data: ", "").strip())
@@ -106,29 +99,24 @@ class ChatService:
                 except json.JSONDecodeError:
                     continue
 
-            # Save assistant message
-            saved_chat = None
             if assistant_message:
-                assistant_chat = Chat(
-                    id=uuid4(),
-                    conversation_id=conversation_id,
-                    role="assistant",
-                    content=assistant_message.replace("<|im_end|>", ""),
-                    tokens=len(assistant_message.split()),
-                    source_urls=source_urls,
-                    created_at=datetime.now(base_datetime.timezone.utc),
-                    updated_at=datetime.now(base_datetime.timezone.utc),
-                    feedback=FeedbackType.NONE.value,
+                assistant_chat = await self.chat_repo.save_chat_message(
+                    {
+                        "conversationId": conversation_id,
+                        "role": "assistant",
+                        "content": assistant_message.replace("<|im_end|>", ""),
+                        "tokens": len(assistant_message.split()),
+                        "feedback": ChatFeedback.NONE.value,
+                        "sourceURLs": source_urls,
+                    }
                 )
-                saved_chat = self.chat_repo.save_chat_message(assistant_chat)
 
-            # Send final message with sources
-            if saved_chat:
-                yield f"data: {json.dumps({ 'complete': True,  'source_urls': source_urls,  'chat_id': str(saved_chat.id)})}\n\n"
-                yield f"data: {json.dumps({ 'question_suggestions': [],  'chat_id': str(saved_chat.id)})}\n\n"
+            if assistant_chat:
+                yield f"data: {json.dumps({ 'complete': True,  'source_urls': source_urls})}\n\n"
+                yield f"data: {json.dumps({ 'question_suggestions': []})}\n\n"
 
         except Exception as e:
             error_message = f"Error processing chat: {str(e)}"
             yield f"data: {json.dumps({'error': error_message})}\n\n"
             if user_message:
-                self.chat_repo.delete_chat(str(user_message.id))
+                await self.chat_repo.delete_chat(user_message.id)
