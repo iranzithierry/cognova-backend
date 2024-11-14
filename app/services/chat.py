@@ -84,7 +84,7 @@ class ChatService:
             assistant_message = ""
 
             async for chunk in chat_provider.request(messages):
-                yield chunk
+                yield chunk.replace("<|im_end|>", "")
                 try:
                     chunk_data = json.loads(chunk.replace("data: ", "").strip())
                     if "token" in chunk_data:
