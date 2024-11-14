@@ -84,7 +84,6 @@ class ChatService:
             assistant_message = ""
 
             async for chunk in chat_provider.request(messages):
-                print("Chunk", chunk)
                 yield chunk
                 try:
                     chunk_data = json.loads(chunk.replace("data: ", "").strip())
