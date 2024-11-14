@@ -1,9 +1,10 @@
 from datetime import datetime
+from app.core.database import db
 from typing import List, Dict, Any, Optional
 
 class BusinessTools:
-    def __init__(self, prisma_client):
-        self.prisma = prisma_client
+    def __init__(self):
+        self.prisma = db
 
     async def get_business_info(self, business_id: str) -> Dict[str, Any]:
         """Get basic business information."""
@@ -154,7 +155,7 @@ class BusinessTools:
         total_amount: float
     ) -> Dict[str, Any]:
         """Calculate delivery availability and fees."""
-        config = await self.prisma.businessConfig.find_first()
+        config = await self.prisma.businessconfig.find_first()
         
         if total_amount < config.minOrderAmount:
             return {
@@ -191,7 +192,7 @@ class BusinessTools:
         policy_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """Get business policies."""
-        config = await self.prisma.businessConfig.find_first()
+        config = await self.prisma.businessconfig.find_first()
         business = await self.prisma.business.find_first()
         
         policies = {
