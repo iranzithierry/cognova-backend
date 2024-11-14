@@ -9,7 +9,7 @@ router = APIRouter()
 @router.get("/scrape/urls", operation_id="scrape_urls")
 async def scrape_urls(url: str):
     try:
-        webscraper = WebScraper(scraper_path="./bin/scrapper")
+        webscraper = WebScraper(scraper_path="../../../bin/scrapper")
         links = webscraper.list_links(url)
         return {
             "status": "success",
