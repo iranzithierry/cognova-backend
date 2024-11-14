@@ -1,5 +1,5 @@
-from app.providers.chat import ChatProvider
 from .tools import tools
+from app.infrastructure.external.ai_providers import ChatProvider
 
 class ToolService:
     def __init__(self, provider: ChatProvider) -> None:

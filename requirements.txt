@@ -2,8 +2,6 @@ fastapi
 uvicorn
 langchain
 openai
-trafilatura
-sqlalchemy
 prisma
 python-dotenv
 html2text
@@ -12,5 +10,6 @@ faiss-cpu
 numpy
 pydantic
 langchain_community
-psycopg2-binary==2.9.10
+cuid2
 Levenshtein
+httpagentparser

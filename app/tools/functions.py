@@ -1,10 +1,10 @@
 import json
-from app.db import Database
+from prisma import Prisma
 from typing import Dict, Any
 
 
 class ToolFunctions:
-    def __init__(self, db: Database):
+    def __init__(self, db: Prisma):
         self.db = db
 
     def execute_function(
