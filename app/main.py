@@ -2,7 +2,6 @@ import logging
 from app.core.database import db
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from app.api.routes import chat as chats_router, sources as sources_router
 
@@ -34,7 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 async def verify_db():
