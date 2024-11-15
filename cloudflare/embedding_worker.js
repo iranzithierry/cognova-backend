@@ -1,7 +1,7 @@
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept-Encoding',
 };
 
 async function handleOptions(request) {
@@ -17,17 +17,19 @@ async function generateEmbeddings(env, input, model = "@cf/baai/bge-large-en-v1.
 
         const response = await env.AI.run(model, textInput);
 
-        const formattedData = [];
-        for (var i = 0; i < response.data.length; i++) {
-            formattedData.push({
-                embedding: response.data[i],
-                index: i,
-                object: "embedding"
-            })
-        }
+        const formattedData = response.data.map((embedding, index) => ({
+            object: "embedding",
+            embedding,
+            index
+        }));
         return {
-
+            object: "list",
             data: formattedData,
+            model,
+            usage: {
+                prompt_tokens: input.length,
+                total_tokens: input.length
+            }
         };
     } catch (error) {
         return {
@@ -35,6 +37,16 @@ async function generateEmbeddings(env, input, model = "@cf/baai/bge-large-en-v1.
             error: error.message,
         };
     }
+}
+
+async function compressResponse(jsonResponse) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(JSON.stringify(jsonResponse));
+    const cs = new CompressionStream('gzip');
+    const writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    return new Response(cs.readable).arrayBuffer();
 }
 
 async function handleRequest(request, env) {
@@ -72,12 +84,28 @@ async function handleRequest(request, env) {
         }
         const result = await generateEmbeddings(env, body.input, model);
 
-        return new Response(JSON.stringify(result), {
-            headers: {
-                'Content-Type': 'application/json',
-                ...corsHeaders,
-            },
-        });
+        // Check if client accepts gzip encoding
+        const acceptEncoding = request.headers.get('accept-encoding') || '';
+        const supportsGzip = acceptEncoding.includes('gzip');
+
+        if (supportsGzip) {
+            const compressed = await compressResponse(result);
+            return new Response(compressed, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Encoding': 'gzip',
+                    'Vary': 'Accept-Encoding',
+                    ...corsHeaders,
+                },
+            });
+        } else {
+            return new Response(JSON.stringify(result), {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...corsHeaders,
+                },
+            });
+        }
 
     } catch (error) {
         return new Response(JSON.stringify({

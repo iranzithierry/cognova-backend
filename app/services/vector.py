@@ -14,6 +14,10 @@ class VectorService:
         self.client = OpenAI(
             base_url=get_config().EMBEDDING_BASE_URL,
             api_key=get_config().EMBEDDING_API_KEY,
+            default_headers={
+                "Accept-Encoding": "gzip",
+                "Content-Type": "application/json",
+            }
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.MAX_CHUNK_SIZE,
@@ -70,8 +74,8 @@ class VectorService:
         if not input_texts:
             raise ValueError("No valid text chunks were created")
 
-        input_texts_embeddings = []
         batch_size = 100
+        input_texts_embeddings = []
 
         try:
             for i in range(0, len(input_texts), batch_size):
