@@ -19,12 +19,3 @@ class ChatProvider(ABC):
     ) -> AsyncGenerator[str, None]:
         """Handle streaming of completion responses"""
         pass
-
-    @abstractmethod
-    def _convert_tool_definition_to_dict(
-        self,
-        tool_name: str,
-        tool_description: str,
-        tool_parameters: list[dict[str, str]],
-    ) -> dict:
-        pass

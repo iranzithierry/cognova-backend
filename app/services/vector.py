@@ -14,10 +14,6 @@ class VectorService:
         self.client = OpenAI(
             base_url=get_config().EMBEDDING_BASE_URL,
             api_key=get_config().EMBEDDING_API_KEY,
-            default_headers={
-                "Accept-Encoding": "gzip",
-                "Content-Type": "application/json",
-            }
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.MAX_CHUNK_SIZE,

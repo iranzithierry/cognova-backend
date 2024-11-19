@@ -1,6 +1,6 @@
 // Configuration
 const CONFIG = {
-    DEFAULT_MODEL: '@cf/meta/llama-3-8b-instruct',
+    DEFAULT_MODEL: '@hf/nousresearch/hermes-2-pro-mistral-7b',
     MODELS: {
         HERMES: '@hf/nousresearch/hermes-2-pro-mistral-7b',
         LLAMA_3: '@cf/meta/llama-3-8b-instruct',

@@ -8,3 +8,7 @@ class ToolProcessingError(Exception):
 class PrismaExecutionError(Exception):
     """Raised when Prisma execution fails"""
     pass
+class ToolExecutionError(Exception):
+    """Custom exception for tool execution failures"""
+
+    pass

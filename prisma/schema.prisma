@@ -2,7 +2,7 @@ generator client {
   provider             = "prisma-client-py"
   interface            = "asyncio"
   recursive_type_depth = "5"
-  previewFeatures      = ["postgresqlExtensions"]
+  previewFeatures      = ["postgresqlExtensions", "fullTextSearch"]
 }
 
 datasource db {
@@ -11,36 +11,154 @@ datasource db {
   extensions = [vector]
 }
 
-model Workspace {
-  id           String          @id @default(cuid())
-  displayName  String
-  name         String          @unique
-  planId       String?
-  ownerId      String
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  bots         Bot[]
-  businesses   Business[]
-  payments     Payment[]
-  sources      Source[]
-  subscription Subscription?
-  vectors      Vector[]
-  users        WorkspaceUser[]
-  owner        User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  plan         Plan?           @relation(fields: [planId], references: [id], onDelete: SetNull)
-
-  @@index([id, planId])
-  @@map("workspaces")
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+  ONCE
+  UNLIMITED
 }
 
-model WorkspaceUser {
-  id          String    @id @default(cuid())
-  workspaceId String
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+enum PaymentStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
 
-  @@map("workspace_users")
+enum PaymentMethodStatus {
+  UNACTIVE
+  ACTIVE
+  FUTURE
+}
+
+enum ChatFeedback {
+  DOWNVOTED
+  UPVOTED
+  NONE
+}
+
+enum WorkspaceInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model User {
+  id              String          @id @default(cuid())
+  name            String?
+  email           String          @unique
+  password        String
+  image           String?
+  emailVerified   Boolean         @default(false)
+  uplineId        String?
+  lastLoggedAt    DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @default(now()) @updatedAt
+  sessions        Session[]
+  upline          User?           @relation("UserUpline", fields: [uplineId], references: [id])
+  downlines       User[]          @relation("UserUpline")
+  workspaces      WorkspaceUser[]
+  ownedWorkspaces Workspace[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String
+  ipAddress    String?
+  device       String?
+  os           String?
+  browser      String?
+  status       String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Role {
+  id                  String                @id @default(cuid())
+  name                String                @unique
+  displayName         String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @default(now()) @updatedAt
+  permissions         Permission[]
+  workspaces          WorkspaceUser[]
+  workspaceInvitation WorkspaceInvitation[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  roleId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@map("permissions")
+}
+
+model Bot {
+  id                 String            @id @default(cuid())
+  workspaceId        String
+  name               String
+  description        String?
+  language           String?
+  systemMessage      String?
+  placeholderMessage String?
+  welcomeMessage     String?
+  starterQuestions   String[]
+  modelId            String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @default(now()) @updatedAt
+  configurations     BotConfiguration?
+  sources            BotSources[]
+  model              Model             @relation(fields: [modelId], references: [id])
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations      Conversation[]
+  business           Business?         @relation(fields: [businessId], references: [id])
+  businessId         String?
+
+  @@map("bots")
+}
+
+model BotConfiguration {
+  id                 String   @id @default(cuid())
+  botId              String   @unique
+  avatarURL          String?
+  uMessageColor      String?
+  aMessageColor      String?
+  fontId             String
+  showSources        Boolean
+  sendButtonText     String?
+  customCSS          String?
+  embedAngle         String?
+  embedWidgetSize    String?
+  embedWidgetIconURL String?
+  embedAutoOpen      Boolean?
+  embedPingMessage   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+  botChatAvatarURL   String?
+  bot                Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@map("bot_configuration")
+}
+
+model BotSources {
+  id        String   @id @default(cuid())
+  botId     String
+  sourceId  String
+  createdAt DateTime @default(now())
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("bot_sources")
 }
 
 model Model {
@@ -50,76 +168,153 @@ model Model {
   planId      String?
   description String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  bots        Bot[]
+  updatedAt   DateTime @default(now()) @updatedAt
+  bot         Bot[]
   plan        Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
 
+  @@index([name])
   @@map("models")
 }
 
-model Source {
-  id            String       @id @default(cuid())
-  workspaceId   String
-  techniqueId   String?
-  title         String
-  url           String
-  status        String
-  contentType   String
-  contentLength Int
-  contentHash   String
-  syncTime      Int
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  bots          BotSources[]
-  technique     Technique?   @relation(fields: [techniqueId], references: [id])
-  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  syncs         Sync[]
-  vectors       Vector[]
+model Business {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  type           String
+  description    String?
+  hasDelivery    Boolean  @default(false)
+  hasPickup      Boolean  @default(false)
+  acceptsReturns Boolean  @default(false)
+  hasWarranty    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-  @@map("sources")
+  products       BusinessProduct[]
+  locations      BusinessLocation[]
+  categories     BusinessCategory[]
+  operatingHours BusinessOperatingHours[]
+  workspace      Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  configurations BusinessConfig?
+  bot            Bot[]
+
+  @@map("businesses")
 }
 
-model Sync {
-  id          String    @id @default(cuid())
-  sourceId    String
-  message     String?
-  status      String
-  startedAt   DateTime?
-  succeedAt   DateTime?
-  errorAt     DateTime?
-  cancelledAt DateTime?
-  source      Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+model BusinessConfig {
+  id                       String  @id @default(cuid())
+  businessId               String  @unique
+  deliveryFee              Float?
+  estimatedDeliveryArrival String?
+  minOrderAmount           Float?
+  taxRate                  Float?
+  returnPeriodDays         Int?
+  warrantyPeriodDays       Int?
+  currency                 String  @default("USD")
 
-  @@map("syncs")
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("business_configs")
 }
 
-model Technique {
+model BusinessCategory {
+  id          String  @id @default(cuid())
+  businessId  String
+  name        String
+  description String?
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products BusinessProduct[]
+
+  @@map("business_categories")
+}
+
+model BusinessProduct {
   id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String
-  planId      String?
+  businessId  String
+  categoryId  String?
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  sku         String?
+  images      String[]
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  sources     Source[]
-  plan        Plan?    @relation(fields: [planId], references: [id])
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  @@map("techniques")
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category BusinessCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("business_products")
 }
 
-model Vector {
-  id           String                 @id @default(cuid())
-  workspaceId  String
-  sourceId     String
-  embedding    Unsupported("vector")?
-  chunkContent String
-  metadata     Json
-  chunkLength  Int
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  source       Source                 @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  workspace    Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+model BusinessLocation {
+  id         String  @id @default(cuid())
+  businessId String
+  name       String
+  address    String
+  city       String
+  state      String?
+  country    String
+  postalCode String?
+  phone      String?
+  email      String?
+  isMain     Boolean @default(false)
 
-  @@map("vectors")
+  business Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  hours    BusinessOperatingHours[]
+
+  @@map("business_locations")
+}
+
+model BusinessOperatingHours {
+  id         String  @id @default(cuid())
+  businessId String
+  locationId String?
+  dayOfWeek  Int
+  openTime   String
+  closeTime  String
+  isClosed   Boolean @default(false)
+
+  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location BusinessLocation? @relation(fields: [locationId], references: [id])
+
+  @@map("business_operating_hours")
+}
+
+model Chat {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  toolCalls      Json?
+  toolCallId     String?
+  tokens         Int
+  feedback       ChatFeedback @default(NONE)
+  sourceURLs     String[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("chats")
+}
+
+model Conversation {
+  id                String   @id @default(cuid())
+  botId             String
+  sessionId         String   @default(cuid())
+  browser           String?
+  os                String?
+  device            String?
+  countryCode       String?
+  generatedCategory String?
+  extraMetadata     Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+  chats             Chat[]
+  bot               Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@map("conversations")
 }
 
 model Subscription {
@@ -130,7 +325,7 @@ model Subscription {
   startDate   DateTime
   endDate     DateTime
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now()) @updatedAt
   payments    Payment[]
   plan        Plan?     @relation(fields: [planId], references: [id])
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -145,7 +340,7 @@ model Plan {
   description   String?        @db.Text
   billingCycle  BillingCycle   @default(MONTHLY)
   createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  updatedAt     DateTime       @default(now()) @updatedAt
   models        Model[]
   features      PlanFeature[]
   subscriptions Subscription[]
@@ -176,7 +371,7 @@ model Payment {
   status          PaymentStatus  @default(PENDING)
   paidAt          DateTime
   createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  updatedAt       DateTime       @default(now()) @updatedAt
   invoices        Invoice[]
   paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
   subscription    Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
@@ -191,7 +386,7 @@ model PaymentMethod {
   displayName String
   status      PaymentMethodStatus @default(ACTIVE)
   createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  updatedAt   DateTime            @default(now()) @updatedAt
   payments    Payment[]
 
   @@map("payment_methods")
@@ -204,292 +399,126 @@ model Invoice {
   issuedAt    DateTime
   dueDate     DateTime
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime @default(now()) @updatedAt
   payment     Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   @@map("invoices")
 }
 
-enum BillingCycle {
-  MONTHLY
-  YEARLY
-  ONCE
-  UNLIMITED
+model Source {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  techniqueId   String?
+  title         String
+  url           String
+  status        String
+  contentType   String
+  contentLength Int
+  contentHash   String
+  syncTime      Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+  bots          BotSources[]
+  technique     Technique?   @relation(fields: [techniqueId], references: [id])
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  syncs         Sync[]
+  vectors       Vector[]
+
+  @@map("sources")
 }
 
-enum PaymentStatus {
-  SUCCESS
-  FAILED
-  PENDING
+model Sync {
+  id          String    @id @default(cuid())
+  sourceId    String
+  message     String?
+  status      String
+  startedAt   DateTime?
+  succeedAt   DateTime?
+  errorAt     DateTime?
+  cancelledAt DateTime?
+  source      Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("syncs")
 }
 
-enum PaymentMethodStatus {
-  UNACTIVE
-  ACTIVE
-  FUTURE
-}
-
-enum ChatFeedback {
-  DOWNVOTED
-  UPVOTED
-  NONE
-}
-
-model Chat {
-  id             String       @id @default(cuid())
-  conversationId String
-  role           String
-  content        String
-  tokens         Int
-  feedback       ChatFeedback @default(NONE)
-  sourceURLs     String[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@map("chats")
-}
-
-model Conversation {
-  id                String   @id @default(cuid())
-  botId             String
-  sessionId         String   @default(cuid())
-  browser           String?
-  os                String?
-  device            String?
-  countryCode       String?
-  generatedCategory String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  chats             Chat[]
-  bot               Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-
-  @@map("conversations")
-}
-
-model Business {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  type        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  products       Product[]
-  locations      Location[]
-  categories     Category[]
-  operatingHours OperatingHours[]
-
-  hasDelivery    Boolean @default(false)
-  hasPickup      Boolean @default(false)
-  acceptsReturns Boolean @default(false)
-  hasWarranty    Boolean @default(false)
-
-  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  configurations BusinessConfig?
-  bot            Bot[]
-
-  @@map("businesses")
-}
-
-model BusinessConfig {
-  id                 String @id @default(cuid())
-  businessId         String @unique
-  deliveryFee        Float?
-  minOrderAmount     Float?
-  taxRate            Float?
-  returnPeriodDays   Int?
-  warrantyPeriodDays Int?
-  currency           String @default("USD")
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  @@map("business_configs")
-}
-
-model Category {
-  id          String  @id @default(cuid())
-  businessId  String
-  name        String
-  description String?
-
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  products Product[]
-
-  @@map("categories")
-}
-
-model Product {
-  id          String   @id @default(cuid())
-  businessId  String
-  categoryId  String?
-  name        String
-  description String?
-  price       Float
-  stock       Int      @default(0)
-  sku         String?
-  images      String[]
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id])
-
-  @@map("products")
-}
-
-model Location {
-  id         String  @id @default(cuid())
-  businessId String
-  name       String
-  address    String
-  city       String
-  state      String?
-  country    String
-  postalCode String?
-  phone      String?
-  email      String?
-  isMain     Boolean @default(false)
-
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  hours    OperatingHours[]
-
-  @@map("locations")
-}
-
-model OperatingHours {
-  id         String  @id @default(cuid())
-  businessId String
-  locationId String?
-  dayOfWeek  Int
-  openTime   String
-  closeTime  String
-  isClosed   Boolean @default(false)
-
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location Location? @relation(fields: [locationId], references: [id])
-
-  @@map("operating_hours")
-}
-
-model Bot {
-  id                 String            @id @default(cuid())
-  workspaceId        String
-  name               String
-  description        String?
-  language           String?
-  systemMessage      String?
-  placeholderMessage String?
-  welcomeMessage     String?
-  starterQuestions   String[]
-  modelId            String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  configurations     BotConfiguration?
-  sources            BotSources[]
-  model              Model?            @relation(fields: [modelId], references: [id], onDelete: SetNull)
-  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  conversations      Conversation[]
-  business           Business?         @relation(fields: [businessId], references: [id])
-  businessId         String?
-
-  @@map("bots")
-}
-
-model BotConfiguration {
-  id                 String   @id @default(cuid())
-  botId              String   @unique
-  avatarURL          String?
-  uMessageColor      String?
-  aMessageColor      String?
-  fontId             String
-  showSources        Boolean
-  sendButtonText     String?
-  customCSS          String?
-  embedAngle         String?
-  embedWidgetSize    String?
-  embedWidgetIconURL String?
-  embedAutoOpen      Boolean?
-  embedPingMessage   String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  botChatAvatarURL   String?
-  bot                Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-
-  @@map("bot_configuration")
-}
-
-model BotSources {
-  id        String   @id @default(cuid())
-  botId     String
-  sourceId  String
-  createdAt DateTime @default(now())
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-
-  @@map("bot_sources")
-}
-
-model User {
-  id              String          @id @default(cuid())
-  name            String?
-  email           String          @unique
-  password        String
-  image           String?
-  roleId          String?
-  emailVerified   Boolean         @default(false)
-  uplineId        String?
-  lastLoggedAt    DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  sessions        Session[]
-  roles           Role?           @relation(fields: [roleId], references: [id])
-  upline          User?           @relation("UserUpline", fields: [uplineId], references: [id])
-  downlines       User[]          @relation("UserUpline")
-  workspaces      WorkspaceUser[]
-  ownedWorkspaces Workspace[]
-
-  @@map("users")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  sessionToken String
-  ipAddress    String?
-  device       String?
-  os           String?
-  browser      String?
-  status       String
-  createdAt    DateTime @default(now())
-  expiresAt    DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-model Role {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  displayName String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  permissions Permission[]
-  Users       User[]
-
-  @@map("roles")
-}
-
-model Permission {
+model Technique {
   id          String   @id @default(cuid())
   name        String   @unique
   displayName String
-  roleId      String
+  planId      String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @default(now()) @updatedAt
+  sources     Source[]
+  plan        Plan?    @relation(fields: [planId], references: [id])
 
-  @@map("permissions")
+  @@map("techniques")
+}
+
+model Vector {
+  id                   String                 @id @default(cuid())
+  workspaceId          String
+  sourceId             String
+  embedding            Unsupported("vector")?
+  markdownChunkContent String?                @db.Text
+  chunkContent         String
+  metadata             Json
+  chunkLength          Int
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @default(now()) @updatedAt
+  source               Source                 @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("vectors")
+}
+
+model Workspace {
+  id           String                @id @default(cuid())
+  displayName  String
+  name         String                @unique
+  planId       String?
+  ownerId      String
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @default(now()) @updatedAt
+  bots         Bot[]
+  businesses   Business[]
+  payments     Payment[]
+  sources      Source[]
+  subscription Subscription?
+  vectors      Vector[]
+  users        WorkspaceUser[]
+  invitations  WorkspaceInvitation[]
+  owner        User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  plan         Plan?                 @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([id, planId, name])
+  @@map("workspaces")
+}
+
+model WorkspaceUser {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  roleId      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role        Role?     @relation(fields: [roleId], references: [id])
+
+  @@index([id, userId])
+  @@map("workspace_users")
+}
+
+model WorkspaceInvitation {
+  id          String                @id @default(cuid())
+  workspaceId String
+  email       String                @unique
+  status      WorkspaceInviteStatus @default(PENDING)
+  roleId      String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @default(now()) @updatedAt
+  role        Role?                 @relation(fields: [roleId], references: [id])
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_invitations")
 }

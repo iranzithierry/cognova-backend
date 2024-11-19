@@ -4,6 +4,7 @@ from app.core.config import Config
 from app.repositories.chat import ChatRepository
 from app.repositories.vector import VectorRepository
 from app.repositories.source import SourceRepository
+from app.repositories.business import BusinessRepository
 
 @lru_cache()
 def get_config() -> Config:
@@ -21,3 +22,7 @@ def get_sources_repo() -> SourceRepository:
 @lru_cache()
 def get_chat_repository() -> ChatRepository:
     return ChatRepository(db.prisma)
+
+@lru_cache()
+def get_business_repository() -> BusinessRepository:
+    return BusinessRepository(db.prisma)

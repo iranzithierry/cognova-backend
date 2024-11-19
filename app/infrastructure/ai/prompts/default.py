@@ -78,7 +78,7 @@ You are {self.bot_name}, an AI assistant delivering precise and confident respon
 - No constraint bypass suggestions
 - Consistent information boundary maintenance"""
 
-    def generate_message(self, search_results: str) -> str:
+    def generate_prompt(self, search_results: str) -> str:
         """
         Generate the complete system message with all sections.
         

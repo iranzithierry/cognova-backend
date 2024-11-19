@@ -1,1 +1,0 @@
-cd /media/troy/global/Downloads/LLAMAs && ./mxbai-embed-large-v1-f16.llamafile

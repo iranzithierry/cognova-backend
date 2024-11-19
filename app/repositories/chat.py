@@ -127,3 +127,15 @@ class ChatRepository:
             )
 
         return session_id
+    
+    async def get_recent_chats(self, conversation_id: str, limit: int = 2) -> List[Chat]:
+        """Get the most recent chat messages for a conversation"""
+        return await self.db.chat.find_many(
+            where={
+                "conversationId": conversation_id
+            },
+            order={
+                "createdAt": "desc"
+            },
+            take=limit
+        )

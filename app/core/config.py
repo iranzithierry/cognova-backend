@@ -1,19 +1,11 @@
 import os
 from dotenv import load_dotenv
+from typing import Literal
 
 
 class Config:
-    def __init__(self, selected_config: str = None):
+    def __init__(self, selected_config: Literal["azure", "cognova", "openai"] = None):
         load_dotenv()
-
-        if selected_config and selected_config not in [
-            "azure",
-            "cognova",
-            "openai",
-        ]:
-            raise ValueError(
-                "Invalid selected_config. Must be one of: azure, cognova, openai"
-            )
 
         # Database settings
         self.DB_URL = os.getenv("DATABASE_URL")
@@ -27,14 +19,12 @@ class Config:
             "azure": {
                 "endpoint": "https://models.inference.ai.azure.com",
                 "api_key": os.environ.get("AZURE_API_KEY", ""),
-                "model": "gpt-4o",
                 "provider": "openai",
             },
             "cognova": {
-                "endpoint": "https://generative.ai.cognova.io/",
-                # "endpoint": "http://localhost:5600",
+                "endpoint": "https://generative.ai.cognova.io",
+                # "endpoint": "http://localhost:8080",
                 "api_key": os.environ.get("COGNOVA_API_KEY", "sk-no-key-required"),
-                "model": "@cf/meta/llama-3-8b-instruct",
                 "provider": "cloudflare",
             },
             "openai": {
@@ -50,6 +40,9 @@ class Config:
         )
         self.OPENAI_BASE_URL = (
             self.API_CONFIG[selected_config]["endpoint"] if selected_config else None
+        )
+        self.OPENAI_PROVIDER: Literal["cloudflare", "openai", "azure"] = (
+            self.API_CONFIG[selected_config]["provider"] if selected_config else None
         )
 
         # EMBEDDING settings
