@@ -50,6 +50,9 @@ class SellerPromptGenerator:
         for loc in self.locations:
             if loc.phone:
                 contact = {
+                    "name": {
+                        "formatted_name": loc.name
+                    },
                     "org": {
                         "company": self.business.name,
                         "department": loc.name,
