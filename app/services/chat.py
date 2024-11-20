@@ -227,7 +227,6 @@ class ChatService:
 
                 if "token" in chunk_data:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
-                    print(token, end="")
                     if token.count("tool_call") == 2:
                         is_collecting_tool_call = True
                     else:
