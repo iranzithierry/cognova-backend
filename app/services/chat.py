@@ -95,6 +95,8 @@ class ChatService:
 
             if result in ([], None, "", "[]"):
                 result = f"No results found."
+            
+            print("EXECUTED TOOL: ", tool_call.name, "WITH: ", tool_call.arguments)
 
             tool_id = generate_cuid()
             await self._save_message(
@@ -167,6 +169,12 @@ class ChatService:
 
     def _stream_data(self, data: Dict[str, Any]) -> str:
         """Format data for streaming"""
+        if "error" in data:
+            try:
+                print("ERROR:", data["error"])
+            except:
+                print("ERROR:", data)
+                pass
         return f"data: {json.dumps(data)}\n\n"
 
     async def handle_chat(
