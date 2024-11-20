@@ -6,7 +6,6 @@ from prisma.models import (
     Chat,
     Business,
     BusinessConfig,
-    BusinessProduct,
     BusinessLocation,
     BusinessOperatingHours,
 )
@@ -45,10 +44,32 @@ class SellerPromptGenerator:
             for loc in self.locations
         ]
 
+    def _format_contact_data(self) -> List[Dict]:
+        """Format contact data for WhatsApp API."""
+        contacts = []
+        for loc in self.locations:
+            if loc.phone:
+                contact = {
+                    "org": {
+                        "company": self.business.name,
+                        "department": loc.name,
+                        "title": "Store Location"
+                    },
+                    "phones": [
+                        {
+                            "phone": loc.phone,
+                            "type": "WORK",
+                            "wa_id": loc.phone.replace("+", "")
+                        }
+                    ]
+                }
+                contacts.append(contact)
+        return contacts
+
     def _format_operating_hours(self) -> str:
         """Format operating hours from the database with proper alignment."""
         days = [
-            "Sunday",  # 0
+            "Sunday",
             "Monday",
             "Tuesday",
             "Wednesday",
@@ -98,6 +119,7 @@ class SellerPromptGenerator:
 - Limited to WhatsApp's supported formatting
 - Use numbered lists (1. 2. 3.) or simple bullet points (•) when needed
 - Images must be sent separately (no inline images) in<images>[image_url,image_url]</images>
+- When sharing contact information for purchase, wrap it in <contacts>contact_data</contacts> tags
 """
         else:
             return """"""
@@ -106,6 +128,7 @@ class SellerPromptGenerator:
         locations_data = self._format_locations_data()
         operating_hours_str = self._format_operating_hours()
         formatting_guide = self._get_formatting_guide()
+        contact_data = self._format_contact_data()
 
         return f"""
 # CORE RULES
@@ -124,13 +147,13 @@ class SellerPromptGenerator:
 - Keep responses focused on sales and always mention prices when discussing products
 - All prices are in {self.config.currency}
 - Format all responses according to the mode-specific rules below
-- When user is satisfied about the products and willing to buy it give him phone number and location of the store and delivery option if is available
-
+- When user is ready to purchase, provide contact information wrapped in <contacts>contact_data</contacts> tags using this format:
+{json.dumps(contact_data, indent=2)}
 {formatting_guide}
-
 # COMMON ERRORS TO AVOID
 - Don't refer customers to the website
 - Don't exclude available product images {'(in web mode)' if self.mode != 'whatsapp' else ''}
+- Always wrap contact information in <contacts>contact_data</contacts> tags when sharing for purchase
 
 # SERVICE CONFIGURATION
 - Delivery: {'Available' if self.business.hasDelivery else 'Not available'}
@@ -154,6 +177,7 @@ BUSINESS HOURS:
 
 # IMPORTANT REMINDERS
 - NEVER reply about product availability without calling search_products first
+- When sharing contact information for purchase, ALWAYS wrap it in <contacts>contact_data</contacts> tags
 - Provide direct contact information instead of website references
 
 Current time: {self._get_current_time()}
