@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from openai import OpenAI
+from prisma.enums import BotTypes
 from prisma.models import Bot, Chat
 from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
 from app.infrastructure.ai.prompts.seller import SellerPromptGenerator
@@ -13,7 +14,6 @@ from app.infrastructure.ai.tools.pydantic_tools.business import (
 )
 from app.api.dependencies import (
     get_chat_repository,
-    get_config,
     get_business_repository,
 )
 from app.infrastructure.ai.providers.cloudflare import CloudflareProvider
@@ -29,17 +29,13 @@ class ChatService:
     def __init__(self):
         self.chat_repo = get_chat_repository()
         self.business_repo = get_business_repository()
-        self.config = get_config()
-        self.client = OpenAI(
-            base_url=self.config.OPENAI_BASE_URL,
-            api_key=self.config.OPENAI_API_KEY,
-        )
+        self.client = None
         self.business_functions = BusinessFunctions()
         self._recursion_count = 0
 
-    async def _get_prompt_generator(self, bot: Bot) -> tuple[str, Any]:
+    async def _get_prompt_generator(self, bot: Bot, search_results: str = None) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
-        if bot.businessId:
+        if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
             business_data = await self.business_repo.get_business_data(bot.businessId)
             generator = SellerPromptGenerator(
                 business=business_data,
@@ -54,13 +50,13 @@ class ChatService:
                 bot_description=bot.description,
                 system_message=bot.description,
             )
-            return generator.generate_prompt(), None
+            return generator.generate_prompt(search_results), None
 
     async def prepare_chat_context(
         self, bot: Bot, conversation_history: List[Chat], search_results: str = None
     ) -> List[Dict[str, str]]:
         """Prepare chat context with system message and conversation history"""
-        system_content, _ = await self._get_prompt_generator(bot)
+        system_content, _ = await self._get_prompt_generator(bot, search_results)
 
         messages = [{"role": MessageRole.SYSTEM.value, "content": system_content}]
         messages.extend([
@@ -196,7 +192,7 @@ class ChatService:
             messages = await self.prepare_chat_context(bot, history, search_results)
 
             chat_params = {}
-            if bot.businessId:
+            if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
                 chat_params.update(
                     {
                         "tool_choice": "auto",
@@ -206,12 +202,18 @@ class ChatService:
                 )
 
             chat_provider = None
-            if self.config.OPENAI_PROVIDER == "cloudflare":
-                chat_provider = CloudflareProvider(
-                    self.config, self.client, bot.model.name
+            self.client = OpenAI(
+                base_url=bot.model.aiProvider.endpointUrl,
+                api_key=bot.model.aiProvider.apiKey,
+            )
+            if bot.model.aiProvider.provider == "cloudflare":
+                chat_provider = CloudflareProvider(self.client, bot.model.name
                 )
-            elif self.config.OPENAI_PROVIDER in "openai":
-                chat_provider = OpenAIProvider(self.config, self.client, bot.model.name)
+            elif bot.model.aiProvider.provider == "openai":
+                chat_provider = OpenAIProvider(self.client, bot.model.name)
+            else:
+                # :TODO Throw an error
+                pass
 
             assistant_message = ""
             is_collecting_tool_call = False

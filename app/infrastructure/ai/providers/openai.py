@@ -3,7 +3,6 @@ from openai import OpenAI
 from . import ChatProvider
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from app.domain.interfaces import StreamResponse, StreamResponseType, Message
-from app.core.config import Config
 from typing import List, Dict, Any, AsyncGenerator
 from app.domain.errors import StreamProcessingError
 
@@ -13,8 +12,7 @@ class OpenAIProvider(ChatProvider):
     OpenAIProvider handles chat completions using OpenAI's direct API
     """
 
-    def __init__(self, config: Config, client: OpenAI, model: str):
-        self.config = config
+    def __init__(self, client: OpenAI, model: str):
         self.model = model
         self.client = client
 
@@ -25,12 +23,6 @@ class OpenAIProvider(ChatProvider):
         Process chat completion request with streaming support
         """
         try:
-            # clean_messages = [
-            #     {
-            #         "role": message["role"].replace("tool", "tool"),
-            #         "message": message["content"]
-            #     } for message in messages
-            # ]
             completion_params = {
                 "model": self.model,
                 "messages": messages,

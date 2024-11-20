@@ -6,7 +6,6 @@ from app.api.dependencies import get_vector_repo, get_config
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
-
 class VectorService:
     MAX_CHUNK_SIZE = 2000
 
@@ -45,25 +44,25 @@ class VectorService:
 
         # Split text into chunks, ensuring complete coverage
         input_texts = []
-        
+
         if batch:
             remaining_text = cleaned_text
-            
+
             while remaining_text:
                 chunks = self.text_splitter.split_text(remaining_text)
                 if not chunks:
                     # If splitting failed, force split at MAX_CHUNK_SIZE
-                    chunks = [remaining_text[:self.MAX_CHUNK_SIZE]]
-                    
+                    chunks = [remaining_text[: self.MAX_CHUNK_SIZE]]
+
                 chunk = chunks[0]
                 if not chunk:  # Ensure we don't add empty chunks
                     break
-                    
+
                 input_texts.append(chunk)
                 chunk_pos = remaining_text.find(chunk) + len(chunk)
                 remaining_text = remaining_text[chunk_pos:]
         else:
-            chunk = cleaned_text[:self.MAX_CHUNK_SIZE]
+            chunk = cleaned_text[: self.MAX_CHUNK_SIZE]
             if chunk:  # Only append if we have content
                 input_texts.append(chunk)
 
@@ -75,20 +74,20 @@ class VectorService:
 
         try:
             for i in range(0, len(input_texts), batch_size):
-                batch_texts = input_texts[i:i + batch_size]
+                batch_texts = input_texts[i : i + batch_size]
                 response = self.client.embeddings.create(
                     input=batch_texts,
                     model=get_config().EMBEDDING_MODEL,
-                    dimensions=1024
+                    dimensions=1024,
                 )
-                
+
                 if not response or not response.data:
                     raise ValueError("Empty response from embeddings API")
-                    
+
                 batch_embeddings = [data.embedding for data in response.data]
                 if not batch_embeddings:
                     raise ValueError("No embeddings generated for batch")
-                    
+
                 input_texts_embeddings.extend(batch_embeddings)
 
             if not input_texts_embeddings:
@@ -96,16 +95,15 @@ class VectorService:
 
             if batch:
                 return input_texts, input_texts_embeddings
-            
+
             # Extra validation for non-batch mode
             if not input_texts[0] or not input_texts_embeddings[0]:
                 raise ValueError("Empty result in single-chunk mode")
-                
+
             return [input_texts[0]], [input_texts_embeddings[0]]
 
         except Exception as e:
             raise RuntimeError(f"Failed to create embeddings: {str(e)}") from e
-
 
     async def search_embeddings(
         self,
@@ -137,11 +135,15 @@ class VectorService:
             if len(processed_query) < 2:
                 processed_query = query_text
             try:
-                _, query_embedding = self.create_embeddings(processed_query, batch=False)
+                _, query_embedding = self.create_embeddings(
+                    processed_query, batch=False
+                )
                 if not query_embedding or not query_embedding[0]:
                     raise ValueError("Failed to generate query embedding")
             except Exception as e:
-                raise RuntimeError(f"Search failed: Unable to create query embedding: {str(e)}") from e
+                raise RuntimeError(
+                    f"Search failed: Unable to create query embedding: {str(e)}"
+                ) from e
 
             query_embedding = query_embedding[0]
             if query_embedding is None:

@@ -6,7 +6,6 @@ from app.domain.interfaces import (
     Completion,
 )
 from . import ChatProvider
-from app.core.config import Config
 from typing import List, Dict, Any, AsyncGenerator, Optional
 from app.domain.errors import StreamProcessingError, ToolProcessingError
 
@@ -16,8 +15,7 @@ class CloudflareProvider(ChatProvider):
     CloudflareProvider handles chat completions using OpenAI's API through Cloudflare
     """
 
-    def __init__(self, config: Config, client: OpenAI, model: str):
-        self.config = config
+    def __init__(self, client: OpenAI, model: str):
         self.model = model
         self.client = client
 

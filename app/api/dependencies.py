@@ -8,7 +8,7 @@ from app.repositories.business import BusinessRepository
 
 @lru_cache()
 def get_config() -> Config:
-    return Config("cognova")
+    return Config()
 
 
 @lru_cache()

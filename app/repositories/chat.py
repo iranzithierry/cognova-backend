@@ -4,6 +4,7 @@ from typing import List, Optional
 from prisma.models import Chat, Bot
 from app.utils import generate_cuid
 from fastapi import Response, Request
+from app.domain.requests import ChatRequest
 from fastapi.exceptions import HTTPException
 from app.domain.validators import CuidValidator
 from app.domain.errors import PrismaExecutionError
@@ -32,7 +33,8 @@ class ChatRepository:
     async def get_bot(self, bot_id: str) -> Optional[Bot]:
         try:
             bot = await self.db.bot.find_unique(
-                where={"id": bot_id}, include={"model": True}
+                where={"id": bot_id},
+                include={"model": {"include": {"aiProvider": True}}, "sources": True},
             )
             return bot
         except Exception as e:
@@ -46,7 +48,9 @@ class ChatRepository:
 
     async def get_conversation(self, conversation_id: str):
         try:
-            conversation = await self.db.conversation.find_first(where={"id": conversation_id})
+            conversation = await self.db.conversation.find_first(
+                where={"id": conversation_id}
+            )
             if not conversation:
                 print("No Conversation for ID", conversation_id)
             return conversation
@@ -54,22 +58,29 @@ class ChatRepository:
             raise PrismaExecutionError(f"Failed to get conversation: {str(e)}")
 
     async def create_conversation(
-        self, bot_id: str, request: Request, response: Response, conversation_id = None
+        self,
+        bot_id: str,
+        chat_request: ChatRequest,
+        request: Request,
+        response: Response,
+        conversation_id=None,
     ):
         metadata = await self.get_browser_metadata(request)
         session_id = await self.get_or_create_session_id(request, response)
-
         conversation_data = {
             "botId": bot_id,
             "sessionId": session_id,
+            "waPhoneNumber": chat_request.wa_phone_number,
+            "waProfilePicture": chat_request.wa_profile_picture,
+            "waProfileName": chat_request.wa_profile_name,
             **metadata,
             "countryCode": request.headers.get("CF-IPCountry"),
         }
         if conversation_id is not None:
             if not CuidValidator.validate_cuid(conversation_id):
                 raise HTTPException(
-                    status_code=400, 
-                    detail="Invalid conversation ID format. Must be a valid CUID."
+                    status_code=400,
+                    detail="Invalid conversation ID format. Must be a valid CUID.",
                 )
             conversation_data["id"] = conversation_id
 
@@ -81,12 +92,17 @@ class ChatRepository:
         return conversation
 
     async def get_or_create_conversation(
-        self, bot_id: str, conversation_id: str, request: Request, response: Response
+        self,
+        bot_id: str,
+        conversation_id: str,
+        chat_request: ChatRequest,
+        request: Request,
+        response: Response,
     ):
         current_conversation = await self.get_conversation(conversation_id)
         if current_conversation:
             return current_conversation
-        
+
         session_id = await self.get_or_create_session_id(request, response)
 
         existing_conversation = await self.db.conversation.find_first(
@@ -98,7 +114,13 @@ class ChatRepository:
         if existing_conversation:
             return existing_conversation
 
-        return await self.create_conversation(bot_id, request, response, conversation_id)
+        return await self.create_conversation(
+            bot_id=bot_id,
+            chat_request=chat_request,
+            request=request,
+            response=response,
+            conversation_id=conversation_id,
+        )
 
     async def get_browser_metadata(self, request: Request):
         user_agent = request.headers.get("user-agent", "")
@@ -127,15 +149,13 @@ class ChatRepository:
             )
 
         return session_id
-    
-    async def get_recent_chats(self, conversation_id: str, limit: int = 2) -> List[Chat]:
+
+    async def get_recent_chats(
+        self, conversation_id: str, limit: int = 2
+    ) -> List[Chat]:
         """Get the most recent chat messages for a conversation"""
         return await self.db.chat.find_many(
-            where={
-                "conversationId": conversation_id
-            },
-            order={
-                "createdAt": "desc"
-            },
-            take=limit
+            where={"conversationId": conversation_id},
+            order={"createdAt": "desc"},
+            take=limit,
         )

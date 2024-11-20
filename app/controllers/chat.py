@@ -1,5 +1,7 @@
+from prisma.enums import BotTypes
 from fastapi import Request, Response
 from app.services.chat import ChatService
+from app.domain.requests import ChatRequest
 from fastapi.exceptions import HTTPException
 from app.services.vector import VectorService
 from app.api.dependencies import get_chat_repository, get_sources_repo
@@ -17,7 +19,7 @@ class ChatController:
         self,
         bot_id: str,
         conversation_id: str,
-        prompt: str,
+        chat_request: ChatRequest,
         request: Request,
         response: Response,
     ):
@@ -28,6 +30,7 @@ class ChatController:
         conversation = await self.chat_repo.get_or_create_conversation(
             bot_id=bot_id,
             conversation_id=conversation_id,
+            chat_request=chat_request,
             request=request,
             response=response,
         )
@@ -38,12 +41,14 @@ class ChatController:
         results = []
         source_urls = []
         search_results = ""
-        if bot.businessId is None:
-            print("Retrieving Sources")
-            source_ids = await self.sources_repo.get_source_ids_of_bot(bot_id=bot_id)
+        if (
+            bot.type == BotTypes.KNOWLEDGE_BASE_ASSISTANT.value
+            and bot.sources.__len__() > 0
+        ):
+            source_ids = [source.id for source in bot.sources]
             # :TODO Caching in redis bot and their source ids
             results = await self.vector_service.search_embeddings(
-                query_text=prompt, source_ids=source_ids, top_k=5
+                query_text=chat_request.prompt, source_ids=source_ids, top_k=5
             )
             source_urls = [
                 source.metadata["source"] if "source" in source.metadata else None
@@ -61,7 +66,7 @@ class ChatController:
                 """
         return self.chat_service.handle_chat(
             bot=bot,
-            prompt=prompt,
+            prompt=chat_request.prompt,
             source_urls=source_urls,
             search_results=search_results,
             conversation_id=conversation_id,

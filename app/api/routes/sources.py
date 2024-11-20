@@ -1,8 +1,8 @@
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException
+from app.api.dependencies import get_sources_repo
 from app.controllers.web_sources import WebSourcesController
 from app.infrastructure.external.web.scraper import WebScraper
-from app.api.dependencies import get_sources_repo, get_vector_repo, get_config
 
 router = APIRouter()
 

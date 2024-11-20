@@ -1,14 +1,14 @@
-from pydantic import BaseModel
 from fastapi import Response, Request
 from app.services.chat import ChatService
+from app.domain.requests import ChatRequest
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException, Body
 from app.controllers.chat import ChatController
 
 router = APIRouter()
 chat_service = ChatService()
-class ChatRequest(BaseModel):
-    prompt: str
+
+
 
 @router.post("/{bot_id}/chat/{conversation_id}", operation_id="chat")
 async def chat(
@@ -23,7 +23,7 @@ async def chat(
         streaming_response = await chat_controller.handle_prompt(
             bot_id=bot_id,
             conversation_id=conversation_id,
-            prompt=chat_request.prompt,
+            chat_request=chat_request,
             request=request,
             response=response
         )
