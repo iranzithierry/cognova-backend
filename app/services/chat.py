@@ -35,7 +35,7 @@ class ChatService:
 
     async def _get_prompt_generator(self, bot: Bot, search_results: str = None) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
-        if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
+        if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value and bot.businessId:
             business_data = await self.business_repo.get_business_data(bot.businessId)
             generator = SellerPromptGenerator(
                 business=business_data,
