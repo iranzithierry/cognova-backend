@@ -70,4 +70,5 @@ class ChatController:
             source_urls=source_urls,
             search_results=search_results,
             conversation_id=conversation_id,
+            chat_request=chat_request
         )

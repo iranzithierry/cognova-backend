@@ -12,7 +12,7 @@ from prisma.models import (
 )
 
 
-ModeType = Literal["whatsapp", "embed", None]
+ModeType = Literal["whatsapp", "web", None]
 
 
 class SellerPromptGenerator:
@@ -128,7 +128,7 @@ class SellerPromptGenerator:
 
 # COMMON ERRORS TO AVOID
 - Don't refer customers to the website
-- Don't exclude available product images {'(in embed mode)' if self.mode != 'whatsapp' else ''}
+- Don't exclude available product images {'(in web mode)' if self.mode != 'whatsapp' else ''}
 
 # SERVICE CONFIGURATION
 - Delivery: {'Available' if self.business.hasDelivery else 'Not available'}

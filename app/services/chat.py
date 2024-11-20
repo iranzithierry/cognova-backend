@@ -5,6 +5,7 @@ from enum import Enum
 from openai import OpenAI
 from prisma.enums import BotTypes
 from prisma.models import Bot, Chat
+from app.domain.requests import ChatRequest
 from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
 from app.infrastructure.ai.prompts.seller import SellerPromptGenerator
 from app.infrastructure.ai.prompts.default import DefaultPromptGenerator
@@ -32,6 +33,7 @@ class ChatService:
         self.client = None
         self.business_functions = BusinessFunctions()
         self._recursion_count = 0
+        self.chat_request: ChatRequest = None
 
     async def _get_prompt_generator(self, bot: Bot, search_results: str = None) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
@@ -42,6 +44,7 @@ class ChatService:
                 config=business_data.configurations,
                 locations=business_data.locations,
                 operating_hours=business_data.operatingHours,
+                mode=self.chat_request.chat_mode
             )
             return generator.generate_prompt(), business_data
         else:
@@ -171,13 +174,14 @@ class ChatService:
         bot: Bot,
         conversation_id: str,
         prompt: str,
+        chat_request: ChatRequest = None,
         search_results: str = None,
         source_urls: List[str] = None,
     ) -> AsyncGenerator[str, None]:
         """Main chat handling method"""
         user_message = None
         source_urls = source_urls or []
-
+        self.chat_request = chat_request
         try:
             if prompt:
                 user_message = await self._save_message(
@@ -229,8 +233,7 @@ class ChatService:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
                     if token.count("tool_call") == 2:
                         is_collecting_tool_call = True
-                    else:
-                        if (
+                    elif (
                             token.strip().startswith("<")
                             and len(assistant_message) < 2
                         ):
