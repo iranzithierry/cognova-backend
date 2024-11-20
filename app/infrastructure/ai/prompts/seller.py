@@ -119,7 +119,7 @@ class SellerPromptGenerator:
 - Limited to WhatsApp's supported formatting
 - Use numbered lists (1. 2. 3.) or simple bullet points (•) when needed
 - Images must be sent separately (no inline images) in<images>[image_url,image_url]</images>
-- When sharing contact information for purchase, wrap it in <contacts>contact_data</contacts> tags
+- When sharing contact information for purchase, wrap it in <contacts>[contact_data]</contacts> tags
 """
         else:
             return """"""
