@@ -157,7 +157,7 @@ class ChatService:
 
             self._recursion_count += 1
             await self.handle_tool_call(ToolCall.from_dict(tool_call), conversation_id)
-            async for response in self.handle_chat(bot, conversation_id, prompt=""):
+            async for response in self.handle_chat(bot, conversation_id, prompt="", chat_request=self.chat_request):
                 yield response
 
         except ToolExecutionError as e:
