@@ -9,7 +9,7 @@ class SearchProducts(BaseModel):
     )
 
 def get_all_business_tools() -> list[StructuredTool]:
-    business_functions = BusinessFunctions()
+    business_functions = BusinessFunctions("-")
     search_products = StructuredTool.from_function(description="Search for products with filters.", func=business_functions.search_products, name="search_products", args_schema=SearchProducts)
 
     business_tools = [

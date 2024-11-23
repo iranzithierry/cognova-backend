@@ -31,11 +31,13 @@ class ChatService:
         self.chat_repo = get_chat_repository()
         self.business_repo = get_business_repository()
         self.client = None
-        self.business_functions = BusinessFunctions()
         self._recursion_count = 0
         self.chat_request: ChatRequest = None
+        self.business_functions: BusinessFunctions = None
 
-    async def _get_prompt_generator(self, bot: Bot, search_results: str = None) -> tuple[str, Any]:
+    async def _get_prompt_generator(
+        self, bot: Bot, search_results: str = None
+    ) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
         if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value and bot.businessId:
             business_data = await self.business_repo.get_business_data(bot.businessId)
@@ -44,7 +46,7 @@ class ChatService:
                 config=business_data.configurations,
                 locations=business_data.locations,
                 operating_hours=business_data.operatingHours,
-                mode=self.chat_request.chat_mode
+                mode=self.chat_request.chat_mode,
             )
             return generator.generate_prompt(), business_data
         else:
@@ -62,19 +64,23 @@ class ChatService:
         system_content, _ = await self._get_prompt_generator(bot, search_results)
 
         messages = [{"role": MessageRole.SYSTEM.value, "content": system_content}]
-        messages.extend([
-            {
-                "role": chat.role,
-                "content": chat.content,
-                **({
-                    "tool_calls": chat.toolCalls,
-                } if chat.toolCalls else {}),
-                **({
-                    "tool_call_id": chat.toolCallId
-                } if chat.toolCallId else {})
-            }
-            for chat in conversation_history
-        ])
+        messages.extend(
+            [
+                {
+                    "role": chat.role,
+                    "content": chat.content,
+                    **(
+                        {
+                            "tool_calls": chat.toolCalls,
+                        }
+                        if chat.toolCalls
+                        else {}
+                    ),
+                    **({"tool_call_id": chat.toolCallId} if chat.toolCallId else {}),
+                }
+                for chat in conversation_history
+            ]
+        )
         return messages
 
     def _get_tool_function(self, function_name: str):
@@ -95,7 +101,7 @@ class ChatService:
 
             if result in ([], None, "", "[]"):
                 result = f"No results found."
-            
+
             print("EXECUTED TOOL: ", tool_call.name, "WITH: ", tool_call.arguments)
 
             tool_id = generate_cuid()
@@ -138,7 +144,7 @@ class ChatService:
             return await self.chat_repo.save_chat_message(
                 {"conversationId": conversation_id, **message.to_dict()}
             )
-            
+
         except Exception as e:
             print(f"Error saving message: {str(e)}")
             return None
@@ -159,7 +165,9 @@ class ChatService:
 
             self._recursion_count += 1
             await self.handle_tool_call(ToolCall.from_dict(tool_call), conversation_id)
-            async for response in self.handle_chat(bot, conversation_id, prompt="", chat_request=self.chat_request):
+            async for response in self.handle_chat(
+                bot, conversation_id, prompt="", chat_request=self.chat_request
+            ):
                 yield response
 
         except ToolExecutionError as e:
@@ -204,7 +212,8 @@ class ChatService:
             messages = await self.prepare_chat_context(bot, history, search_results)
 
             chat_params = {}
-            if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
+            if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value and bot.businessId:
+                self.business_functions = BusinessFunctions(bot.businessId)
                 chat_params.update(
                     {
                         "tool_choice": "auto",
@@ -219,8 +228,7 @@ class ChatService:
                 api_key=bot.model.aiProvider.apiKey,
             )
             if bot.model.aiProvider.provider == "cloudflare":
-                chat_provider = CloudflareProvider(self.client, bot.model.name
-                )
+                chat_provider = CloudflareProvider(self.client, bot.model.name)
             elif bot.model.aiProvider.provider == "openai":
                 chat_provider = OpenAIProvider(self.client, bot.model.name)
             else:
@@ -239,26 +247,28 @@ class ChatService:
 
                 if "token" in chunk_data:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
-                    if token.count("tool_call") == 2:
-                        is_collecting_tool_call = True
-                    elif (
-                            token.strip().startswith("<")
-                            and len(assistant_message) < 2
+                    if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
+                        if token.count("tool_call") == 2:
+                            is_collecting_tool_call = True
+                        elif (
+                            token.strip().startswith("<") and len(assistant_message) < 2
                         ):
                             is_collecting_tool_call = True
                             assistant_message += token
                             continue
 
-                    if is_collecting_tool_call:
-                        assistant_message += token
-                        if "</tool_call>" in assistant_message:
-                            is_collecting_tool_call = False
-                            tool_call = self._accumulate_tool_call(assistant_message)
-                            async for response in self._handle_tool_response(
-                                bot, conversation_id, tool_call
-                            ):
-                                yield response
-                        continue
+                        if is_collecting_tool_call:
+                            assistant_message += token
+                            if "</tool_call>" in assistant_message:
+                                is_collecting_tool_call = False
+                                tool_call = self._accumulate_tool_call(
+                                    assistant_message
+                                )
+                                async for response in self._handle_tool_response(
+                                    bot, conversation_id, tool_call
+                                ):
+                                    yield response
+                            continue
 
                     assistant_message += token
                     yield self._stream_data({"token": token})

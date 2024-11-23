@@ -11,6 +11,7 @@ datasource db {
   extensions = [vector]
 }
 
+
 enum BillingCycle {
   MONTHLY
   YEARLY
@@ -223,41 +224,45 @@ model Business {
 
     products       BusinessProduct[]
     locations      BusinessLocation[]
-    categories     BusinessCategory[]
+    categories     BusinessProductsCategory[]
     operatingHours BusinessOperatingHours[]
-    workspace      Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+    workspace      Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
     configurations BusinessConfig?
-    bot            Bot[]
+    bots           Bot[]
 
     @@map("businesses")
 }
 
 model BusinessConfig {
-    id                       String  @id @default(cuid())
-    businessId               String  @unique
+    id                       String   @id @default(cuid())
+    businessId               String   @unique
     deliveryFee              Float?
     estimatedDeliveryArrival String?
     minOrderAmount           Float?
     taxRate                  Float?
     returnPeriodDays         Int?
     warrantyPeriodDays       Int?
-    currency                 String  @default("USD")
+    currency                 String   @default("USD")
+    createdAt                DateTime @default(now())
+    updatedAt                DateTime @default(now()) @updatedAt
 
     business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
     @@map("business_configs")
 }
 
-model BusinessCategory {
-    id          String  @id @default(cuid())
+model BusinessProductsCategory {
+    id          String   @id @default(cuid())
     businessId  String
     name        String
     description String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
 
     business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
     products BusinessProduct[]
 
-    @@map("business_categories")
+    @@map("business_products_categories")
 }
 
 model BusinessProduct {
@@ -274,14 +279,14 @@ model BusinessProduct {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now()) @updatedAt
 
-    business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-    category BusinessCategory? @relation(fields: [categoryId], references: [id])
+    business Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+    category BusinessProductsCategory? @relation(fields: [categoryId], references: [id])
 
     @@map("business_products")
 }
 
 model BusinessLocation {
-    id         String  @id @default(cuid())
+    id         String   @id @default(cuid())
     businessId String
     name       String
     address    String
@@ -291,7 +296,9 @@ model BusinessLocation {
     postalCode String?
     phone      String?
     email      String?
-    isMain     Boolean @default(false)
+    isMain     Boolean  @default(false)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
 
     business Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
     hours    BusinessOperatingHours[]
@@ -300,13 +307,15 @@ model BusinessLocation {
 }
 
 model BusinessOperatingHours {
-    id         String  @id @default(cuid())
+    id         String   @id @default(cuid())
     businessId String
     locationId String?
     dayOfWeek  Int
     openTime   String
     closeTime  String
-    isClosed   Boolean @default(false)
+    isClosed   Boolean  @default(false)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
 
     business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
     location BusinessLocation? @relation(fields: [locationId], references: [id])
@@ -383,7 +392,6 @@ model Plan {
   features      PlanFeature[]
   subscriptions Subscription[]
   techniques    Technique[]
-  botTypes      BotTypes[]
 
   @@map("plans")
 }
@@ -548,7 +556,7 @@ model WorkspaceUser {
 model WorkspaceInvitation {
   id          String                @id @default(cuid())
   workspaceId String
-  email       String                @unique
+  email       String
   status      WorkspaceInviteStatus @default(PENDING)
   roleId      String?
   createdAt   DateTime              @default(now())

@@ -4,8 +4,9 @@ from typing import List, Dict, Any, Optional
 
 
 class BusinessFunctions:
-    def __init__(self):
+    def __init__(self, business_id: str):
         self.prisma = db.prisma
+        self.business_id = business_id
 
     async def search_products(
         self,
@@ -15,6 +16,7 @@ class BusinessFunctions:
         where = {}
         if query == "*LATEST*":
             where = {
+                "businessId": self.business_id,
                 "isActive": True,
             }
         else:
@@ -24,7 +26,16 @@ class BusinessFunctions:
                 "OR": [
                     {"name": {"search": formatted_query}},
                     {"description": {"search": formatted_query}},
+                    {
+                        "category": {
+                            "name": {
+                                "search": formatted_query,
+                            }
+                        }
+                    },
                 ],
+
+                "businessId": self.business_id,
                 "isActive": True,
             }
 
@@ -110,7 +121,7 @@ class BusinessFunctions:
 
     async def get_categories(self) -> List[Dict[str, Any]]:
         """Get all product categories."""
-        categories = await self.prisma.businesscategory.find_many(
+        categories = await self.prisma.businessproductscategory.find_many(
             include={"products": {"select": {"id": True}}}
         )
 
