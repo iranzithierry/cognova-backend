@@ -39,8 +39,7 @@ class BusinessFunctions:
                 "isActive": True,
             }
         
-        # Add order by relevance for search results
-        order = [{"name": "asc"}]  # default ordering
+        order = [{"name": "asc"}]
         if query != "*LATEST*":
             order = [
                 {
@@ -59,7 +58,7 @@ class BusinessFunctions:
             order=order
         )
         
-        print("GOT PRODUCTS", products)
+        print("GOT PRODUCTS", products.__len__())
         return [
             {
                 "id": product.id,
