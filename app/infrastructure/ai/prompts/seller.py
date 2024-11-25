@@ -124,6 +124,7 @@ class SellerPromptGenerator:
 - Use numbered lists (1. 2. 3.) or simple bullet points (•) when needed
 - Images must be sent separately (no inline images) in<images>[image_url,image_url]</images>
 - When sharing contact information for purchase, wrap it in <contacts>[contact_data]</contacts> tags
+- And add this section `tel:<phone>` (choose main store) to call directly but specify it like you're telling user to call through this number
 """
         else:
             return """"""
@@ -155,11 +156,11 @@ class SellerPromptGenerator:
 - Format all responses according to the mode-specific rules below
 - When user is ready to purchase, provide contact information wrapped in <contacts>contact_data</contacts> tags using this format:
 {json.dumps(contact_data, indent=2)}
+- And add this section `tel:<phone>` (choose main store) to call directly but specify it like you're telling user to call through this number
 {formatting_guide}
 # COMMON ERRORS TO AVOID
 - Don't refer customers to the website
 - Don't exclude available product images {'(in web mode)' if self.mode != 'whatsapp' else ''}
-- Always wrap contact information in <contacts>contact_data</contacts> tags when sharing for purchase
 
 # SERVICE CONFIGURATION
 - Delivery: {'Available' if self.business.hasDelivery else 'Not available'}
