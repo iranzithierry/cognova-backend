@@ -20,8 +20,9 @@ class BusinessFunctions:
                 "isActive": True,
             }
         else:
-            query = split_camel_case(query).lower()
-            formatted_query = " & ".join(word + ":*" for word in query.split())
+            # Simplified query formatting - don't split camel case to avoid breaking product names
+            formatted_query = " | ".join(f"{word}:*" for word in query.lower().split())
+            print("SEARCHING QUERY", formatted_query)
             where = {
                 "OR": [
                     {"name": {"search": formatted_query}},
@@ -34,15 +35,31 @@ class BusinessFunctions:
                         }
                     },
                 ],
-
                 "businessId": self.business_id,
                 "isActive": True,
             }
-
+        
+        # Add order by relevance for search results
+        order = [{"name": "asc"}]  # default ordering
+        if query != "*LATEST*":
+            order = [
+                {
+                    "_relevance": {
+                        "fields": ["name"],
+                        "search": formatted_query,
+                        "sort": "desc"
+                    }
+                }
+            ]
+        
         products = await self.prisma.businessproduct.find_many(
-            where=where, include={"category": True}, take=15
+            where=where,
+            include={"category": True},
+            take=15,
+            order=order
         )
-
+        
+        print("GOT PRODUCTS", products)
         return [
             {
                 "id": product.id,

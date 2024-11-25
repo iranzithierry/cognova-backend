@@ -216,7 +216,6 @@ model Business {
     type           String
     description    String?
     hasDelivery    Boolean  @default(false)
-    hasPickup      Boolean  @default(false)
     acceptsReturns Boolean  @default(false)
     hasWarranty    Boolean  @default(false)
     createdAt      DateTime @default(now())

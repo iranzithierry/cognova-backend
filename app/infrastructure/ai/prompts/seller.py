@@ -164,7 +164,6 @@ class SellerPromptGenerator:
 # SERVICE CONFIGURATION
 - Delivery: {'Available' if self.business.hasDelivery else 'Not available'}
 {f'(Minimum order: {self.config.minOrderAmount} {self.config.currency}, Fee: {self.config.deliveryFee} {self.config.currency})' if self.business.hasDelivery else ''}
-- Pickup: {'Available' if self.business.hasPickup else 'Not available'}
 - Returns: {'Accepted' if self.business.acceptsReturns else 'Not available'}
 {f'(Within {self.config.returnPeriodDays} days)' if self.business.acceptsReturns else ''}
 - Warranty: {'Available' if self.business.hasWarranty else 'Not available'}
