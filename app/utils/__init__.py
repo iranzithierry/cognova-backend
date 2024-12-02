@@ -30,5 +30,15 @@ def split_camel_case(text: str) -> str:
     result.append(current_word)
     return ' '.join(result)
 
+def is_positive_integer(value):
+    try:
+        if not value:
+            return False
+        
+        num = int(value)
+        return num > 0
+    except (ValueError, TypeError):
+        return False
+    
 def now():
     return datetime.datetime.now(datetime.timezone.utc)

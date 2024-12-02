@@ -91,7 +91,10 @@ class SellerPromptGenerator:
                             )
             hours_by_day[location.name] = "  ".join(location_hours)
 
-        max_location_length = max(len(location) for location in hours_by_day)
+        if not hours_by_day:
+            return "No operating hours available."
+
+        max_location_length = max(len(location) for location in hours_by_day) if hours_by_day else 0
 
         prefix = "## " if self.mode != "whatsapp" else "*"
         suffix = "" if self.mode != "whatsapp" else "*"
@@ -99,7 +102,7 @@ class SellerPromptGenerator:
         return "\n".join(
             f"{prefix}{location}{suffix}: {' ' * (max_location_length - len(location))}{hours}"
             for location, hours in hours_by_day.items()
-        )
+        ) if hours_by_day else "No operating hours available."
 
     def _get_formatting_guide(self) -> str:
         """Return formatting guide based on mode."""

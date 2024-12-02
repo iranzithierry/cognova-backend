@@ -75,9 +75,8 @@ model Business {
 
   products       BusinessProduct[]
   locations      BusinessLocation[]
-  categories     BusinessProductsCategory[]
   operatingHours BusinessOperatingHours[]
-  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace      Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   configurations BusinessConfig?
   bots           Bot[]
 
@@ -104,20 +103,6 @@ model BusinessConfig {
   @@map("business_configs")
 }
 
-model BusinessProductsCategory {
-  id          String   @id @default(cuid())
-  businessId  String
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
-
-  business Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  products BusinessProduct[]
-
-  @@map("business_products_categories")
-}
-
 model BusinessProduct {
   id          String   @id @default(cuid())
   businessId  String
@@ -125,14 +110,14 @@ model BusinessProduct {
   name        String
   description String?
   price       Float
-  stock       Int      @default(0)
+  stock       String?  @default("IN_STOCK")
   images      String[]
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  business Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category BusinessProductsCategory? @relation(fields: [categoryId], references: [id])
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category ProductCategory? @relation(fields: [categoryId], references: [id])
 
   @@map("business_products")
 }
@@ -171,6 +156,17 @@ model BusinessOperatingHours {
   location BusinessLocation? @relation(fields: [locationId], references: [id])
 
   @@map("business_operating_hours")
+}
+
+model ProductCategory {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @default(now()) @updatedAt
+  products    BusinessProduct[]
+
+  @@map("product_categories")
 }
 
 model Subscription {

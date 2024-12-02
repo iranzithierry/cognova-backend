@@ -1,5 +1,5 @@
 from app.core.database import db
-from app.utils import split_camel_case
+from app.utils import split_camel_case, is_positive_integer
 from typing import List, Dict, Any, Optional
 
 
@@ -57,8 +57,6 @@ class BusinessFunctions:
             take=15,
             order=order
         )
-        
-        print("GOT PRODUCTS", products.__len__())
         return [
             {
                 "id": product.id,
@@ -80,9 +78,17 @@ class BusinessFunctions:
             where={"id": product_id},
         )
 
+        in_stock = "No"
+        stock_value = product.stock
+        if is_positive_integer(stock_value):
+            in_stock = int(stock_value) > 0 
+        elif stock_value == "IN_STOCK":
+            in_stock = "Yes"
+        else:
+            in_stock = "No"
         return {
-            "product_name": product.name,
-            "in_stock": product.stock > 0,
+            "product_name": in_stock,
+            "in_stock": stock_value,
             "stock_count": product.stock,
             "location": location_id if location_id else "all",
         }
@@ -137,7 +143,7 @@ class BusinessFunctions:
 
     async def get_categories(self) -> List[Dict[str, Any]]:
         """Get all product categories."""
-        categories = await self.prisma.businessproductscategory.find_many(
+        categories = await self.prisma.productcategory.find_many(
             include={"products": {"select": {"id": True}}}
         )
 
