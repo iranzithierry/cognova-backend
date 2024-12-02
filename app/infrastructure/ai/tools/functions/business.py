@@ -121,11 +121,11 @@ class BusinessFunctions:
         """Calculate delivery availability and fees."""
         config = await self.prisma.businessconfig.find_first()
 
-        if total_amount < config.minOrderAmount:
+        if total_amount < config.minDeliveryOrderAmount:
             return {
                 "available": False,
-                "message": f"Minimum order amount for delivery is {config.minOrderAmount}",
-                "min_amount": config.minOrderAmount,
+                "message": f"Minimum order amount for delivery is {config.minDeliveryOrderAmount}",
+                "min_amount": config.minDeliveryOrderAmount,
             }
 
         return {
@@ -160,18 +160,18 @@ class BusinessFunctions:
 
         policies = {
             "returns": {
-                "available": business.acceptsReturns,
-                "period_days": config.returnPeriodDays,
+                "available": config.acceptsReturns,
+                "period_days": config.returnPeriod,
                 "conditions": "Item must be unused and in original packaging",
             },
             "warranty": {
-                "available": business.hasWarranty,
-                "period_days": config.warrantyPeriodDays,
+                "available": config.hasWarranty,
+                "period_days": config.warrantyPeriod,
                 "conditions": "Covers manufacturing defects",
             },
             "delivery": {
-                "available": business.hasDelivery,
-                "min_amount": config.minOrderAmount,
+                "available": config.hasDelivery,
+                "min_amount": config.minDeliveryOrderAmount,
                 "fee": config.deliveryFee,
             },
         }

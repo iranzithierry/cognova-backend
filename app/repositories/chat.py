@@ -34,7 +34,7 @@ class ChatRepository:
         try:
             bot = await self.db.bot.find_unique(
                 where={"id": bot_id},
-                include={"model": {"include": {"aiProvider": True}}, "sources": True},
+                include={"model": {"include": {"aiProvider": True}}},
             )
             return bot
         except Exception as e:
@@ -65,7 +65,6 @@ class ChatRepository:
         response: Response,
         conversation_id=None,
     ):
-        metadata = await self.get_browser_metadata(request)
         session_id = await self.get_or_create_session_id(request, response)
         conversation_data = {
             "botId": bot_id,
@@ -73,7 +72,6 @@ class ChatRepository:
             "waPhoneNumber": chat_request.wa_phone_number,
             "waProfilePicture": chat_request.wa_profile_picture,
             "waProfileName": chat_request.wa_profile_name,
-            **metadata,
             "countryCode": request.headers.get("CF-IPCountry"),
         }
         if conversation_id is not None:

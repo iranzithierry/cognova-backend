@@ -80,7 +80,6 @@ class Message:
     toolCallId: Optional[str] = None
     tokens: Optional[int] = None
     feedback: Optional[str] = ChatFeedback.NONE.value
-    source_urls: List[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -90,5 +89,4 @@ class Message:
             "toolCallId": self.toolCallId,
             "tokens": self.tokens or len(str(self.content).split()),
             "feedback": self.feedback,
-            "sourceURLs": self.source_urls or [],
         }

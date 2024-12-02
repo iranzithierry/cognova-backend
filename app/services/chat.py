@@ -8,7 +8,6 @@ from prisma.models import Bot, Chat
 from app.domain.requests import ChatRequest
 from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
 from app.infrastructure.ai.prompts.seller import SellerPromptGenerator
-from app.infrastructure.ai.prompts.default import DefaultPromptGenerator
 from app.infrastructure.ai.tools.functions.business import BusinessFunctions
 from app.infrastructure.ai.tools.pydantic_tools.business import (
     get_all_business_functions,
@@ -35,11 +34,9 @@ class ChatService:
         self.chat_request: ChatRequest = None
         self.business_functions: BusinessFunctions = None
 
-    async def _get_prompt_generator(
-        self, bot: Bot, search_results: str = None
-    ) -> tuple[str, Any]:
+    async def _get_prompt_generator(self, bot: Bot) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
-        if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value and bot.businessId:
+        if bot.businessId:
             business_data = await self.business_repo.get_business_data(bot.businessId)
             generator = SellerPromptGenerator(
                 business=business_data,
@@ -49,19 +46,12 @@ class ChatService:
                 mode=self.chat_request.chat_mode,
             )
             return generator.generate_prompt(), business_data
-        else:
-            generator = DefaultPromptGenerator(
-                bot_name=bot.name,
-                bot_description=bot.description,
-                system_message=bot.description,
-            )
-            return generator.generate_prompt(search_results), None
 
     async def prepare_chat_context(
-        self, bot: Bot, conversation_history: List[Chat], search_results: str = None
+        self, bot: Bot, conversation_history: List[Chat]
     ) -> List[Dict[str, str]]:
         """Prepare chat context with system message and conversation history"""
-        system_content, _ = await self._get_prompt_generator(bot, search_results)
+        system_content, _ = await self._get_prompt_generator(bot)
 
         messages = [{"role": MessageRole.SYSTEM.value, "content": system_content}]
         messages.extend(
@@ -121,7 +111,6 @@ class ChatService:
                         }
                     ],
                     toolCallId=tool_id,
-                    source_urls=[],
                 ),
             )
             await self._save_message(
@@ -130,7 +119,6 @@ class ChatService:
                     role=MessageRole.TOOL.value,
                     content=result,
                     toolCallId=tool_id,
-                    source_urls=[],
                 ),
             )
         except Exception as e:
@@ -191,12 +179,9 @@ class ChatService:
         conversation_id: str,
         prompt: str,
         chat_request: ChatRequest = None,
-        search_results: str = None,
-        source_urls: List[str] = None,
     ) -> AsyncGenerator[str, None]:
         """Main chat handling method"""
         user_message = None
-        source_urls = source_urls or []
         self.chat_request = chat_request
         try:
             if prompt:
@@ -205,14 +190,13 @@ class ChatService:
                     Message(
                         role=MessageRole.USER.value,
                         content=prompt,
-                        source_urls=source_urls,
                     ),
                 )
             history = await self.chat_repo.get_chats(conversation_id)
-            messages = await self.prepare_chat_context(bot, history, search_results)
+            messages = await self.prepare_chat_context(bot, history)
 
             chat_params = {}
-            if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value and bot.businessId:
+            if  bot.businessId:
                 self.business_functions = BusinessFunctions(bot.businessId)
                 chat_params.update(
                     {
@@ -247,28 +231,27 @@ class ChatService:
 
                 if "token" in chunk_data:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
-                    if bot.type == BotTypes.PRODUCTS_BUYER_ASSISTANT.value:
-                        if token.count("tool_call") == 2:
-                            is_collecting_tool_call = True
-                        elif (
-                            token.strip().startswith("<") and len(assistant_message) < 2
-                        ):
-                            is_collecting_tool_call = True
-                            assistant_message += token
-                            continue
+                    if token.count("tool_call") == 2:
+                        is_collecting_tool_call = True
+                    elif (
+                        token.strip().startswith("<") and len(assistant_message) < 2
+                    ):
+                        is_collecting_tool_call = True
+                        assistant_message += token
+                        continue
 
-                        if is_collecting_tool_call:
-                            assistant_message += token
-                            if "</tool_call>" in assistant_message:
-                                is_collecting_tool_call = False
-                                tool_call = self._accumulate_tool_call(
-                                    assistant_message
-                                )
-                                async for response in self._handle_tool_response(
-                                    bot, conversation_id, tool_call
-                                ):
-                                    yield response
-                            continue
+                    if is_collecting_tool_call:
+                        assistant_message += token
+                        if "</tool_call>" in assistant_message:
+                            is_collecting_tool_call = False
+                            tool_call = self._accumulate_tool_call(
+                                assistant_message
+                            )
+                            async for response in self._handle_tool_response(
+                                bot, conversation_id, tool_call
+                            ):
+                                yield response
+                        continue
 
                     assistant_message += token
                     yield self._stream_data({"token": token})
@@ -279,7 +262,6 @@ class ChatService:
                     Message(
                         role=MessageRole.ASSISTANT.value,
                         content=assistant_message,
-                        source_urls=source_urls,
                     ),
                 )
 
@@ -287,7 +269,6 @@ class ChatService:
                     yield self._stream_data(
                         {
                             "complete": True,
-                            "source_urls": source_urls,
                             "question_suggestions": [],
                         }
                     )

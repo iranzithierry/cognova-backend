@@ -72,15 +72,6 @@ class SellerPromptGenerator:
 
     def _format_operating_hours(self) -> str:
         """Format operating hours from the database with proper alignment."""
-        days = [
-            "Sunday",
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-        ]
         hours_by_day = {}
 
         for location in self.locations:
@@ -88,14 +79,15 @@ class SellerPromptGenerator:
             location_hours = []
 
             for hour in sorted(self.operating_hours, key=lambda x: x.dayOfWeek):
+                hour: BusinessOperatingHours = hour
                 if hour.locationId == location.id:
                     if hour.dayOfWeek not in seen_days:
                         seen_days.add(hour.dayOfWeek)
                         if hour.isClosed:
-                            location_hours.append(f"{days[hour.dayOfWeek]}: CLOSED")
+                            location_hours.append(f"{hour.dayOfWeek}: CLOSED")
                         else:
                             location_hours.append(
-                                f"{days[hour.dayOfWeek]}: {hour.openTime} - {hour.closeTime}"
+                                f"{hour.dayOfWeek}: {hour.openTime} - {hour.closeTime}"
                             )
             hours_by_day[location.name] = "  ".join(location_hours)
 
@@ -163,12 +155,12 @@ class SellerPromptGenerator:
 - Don't exclude available product images {'(in web mode)' if self.mode != 'whatsapp' else ''}
 
 # SERVICE CONFIGURATION
-- Delivery: {'Available' if self.business.hasDelivery else 'Not available'}
-{f'(Minimum order: {self.config.minOrderAmount} {self.config.currency}, Fee: {self.config.deliveryFee} {self.config.currency})' if self.business.hasDelivery else ''}
-- Returns: {'Accepted' if self.business.acceptsReturns else 'Not available'}
-{f'(Within {self.config.returnPeriodDays} days)' if self.business.acceptsReturns else ''}
-- Warranty: {'Available' if self.business.hasWarranty else 'Not available'}
-{f'({self.config.warrantyPeriodDays} days)' if self.business.hasWarranty else ''}
+- Delivery: {'Available' if self.config.hasDelivery else 'Not available'}
+{f'(Minimum order: {self.config.minDeliveryOrderAmount} {self.config.currency}, Fee: {self.config.deliveryFee} {self.config.currency})' if self.config.hasDelivery else ''}
+- Returns: {'Accepted' if self.config.acceptsReturns else 'Not available'}
+{f'(Within {self.config.returnPeriod})' if self.config.acceptsReturns else ''}
+- Warranty: {'Available' if self.config.hasWarranty else 'Not available'}
+{f'({self.config.warrantyPeriod})' if self.config.hasWarranty else ''}
 
 # <BUSINESS_DATA>
 DESCRIPTION:
