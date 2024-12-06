@@ -1,0 +1,66 @@
+name: Deploy to Production
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+on: "workflow_dispatch"
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: production
+      
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_USER: ${{ vars.SSH_USER }}
+      SSH_USER_PASS: ${{ secrets.SSH_USER_PASS }}
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+      
+    steps:
+      - name: Install SSH client
+        run: sudo apt-get install -y openssh-client
+        
+      - name: Add SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_USER_PASS }}
+          script: |
+            cd /home/cognova-api/htdocs/api.cognova.io
+            
+            # Configure Git credentials
+            git config --global credential.helper store
+            echo "https://oauth2:${{ env.GIT_TOKEN }}@github.com" > ~/.git-credentials
+            
+            # Pull latest changes
+            git pull origin main
+            
+            # Switch environment
+            source venv/bin/activate
+
+            # Install dependencies
+            pip install -r requirements.txt
+
+            # Generate Prisma models
+            prisma generate
+            
+            # Update Prisma models
+            sed -i.bak "s/'models\./'/" ./venv/lib/python3.*/site-packages/prisma/models.py
+            
+            # Restart PM2 process
+            pm2 restart ecosystem.config.json
+            
+            # Clean up credentials for security
+            rm ~/.git-credentials
