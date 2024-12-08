@@ -282,9 +282,6 @@ model Conversation {
   sessionId         String   @default(cuid())
   countryCode       String?
   generatedCategory String?
-  waPhoneNumber     String?
-  waProfilePicture  String?
-  waProfileName     String?
   extraMetadata     Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @default(now()) @updatedAt
@@ -413,7 +410,6 @@ model Bot {
   language      String?
   systemMessage String?
   modelId       String?
-  waPhoneNumber String?        @unique
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
   type          BotTypes       @default(SALES_ASSISTANT)

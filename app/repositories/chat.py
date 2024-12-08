@@ -69,9 +69,6 @@ class ChatRepository:
         conversation_data = {
             "botId": bot_id,
             "sessionId": session_id,
-            "waPhoneNumber": chat_request.wa_phone_number,
-            "waProfilePicture": chat_request.wa_profile_picture,
-            "waProfileName": chat_request.wa_profile_name,
             "countryCode": request.headers.get("CF-IPCountry"),
         }
         if conversation_id is not None:

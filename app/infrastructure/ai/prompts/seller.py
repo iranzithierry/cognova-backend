@@ -137,6 +137,7 @@ class SellerPromptGenerator:
   1. Call search_products with the name/brand/category/key-term
   2. Show ALL results found
   3. NEVER ask for more specifics first
+  4. To ensure a seamless real-time chat flow during conversations, if a tool responds with "none" or "results not found," you must always invoke the tool again to retrieve results or provide the most relevant information available.
 - NEVER make multiple tool calls at once
 - For multiple search terms (e.g. "Adidas Yeezy"), combine them into a single query: search_products with query="adidas yeezy"
 - When users ask to see all products, use search_products with query="*LATEST*"
@@ -147,7 +148,7 @@ class SellerPromptGenerator:
 
 
 - Keep responses focused on sales and always mention prices when discussing products
-- All prices are in {self.config.currency}
+- All prices are in {self.config.currency if self.config and "currency" in self.config else "USD"}
 - Format all responses according to the mode-specific rules below
 - When user is ready to purchase, provide contact information wrapped in <contacts>contact_data</contacts> tags using this format:
 {json.dumps(contact_data, indent=2)}
