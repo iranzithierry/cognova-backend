@@ -1,4 +1,4 @@
-import ast
+import re
 import json
 from dataclasses import dataclass
 from enum import Enum
@@ -233,9 +233,7 @@ class ChatService:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
                     if token.count("tool_call") == 2:
                         is_collecting_tool_call = True
-                    elif (
-                        token.strip().startswith("<") and len(assistant_message) < 2
-                    ):
+                    elif (token.strip().startswith("<") and len(assistant_message) < 2 and token.count("tool_call>") != 2):
                         is_collecting_tool_call = True
                         assistant_message += token
                         continue
@@ -280,17 +278,19 @@ class ChatService:
 
     def _accumulate_tool_call(self, content: str) -> Dict[str, Any]:
         """Parse accumulated tool call content"""
-        clean_content = (
-            content.replace("<tool_call>", "")
-            .replace("</tool_call>", "")
-            .replace("None", "null")
-            .replace("'", '"')
-            .strip()
-        )
+        tool_call_match = re.search(r"<tool_call>(.*?)</tool_call>", content, re.DOTALL)
+        tool_calls_str = "{}"
         try:
-            return json.loads(clean_content)
+            if tool_call_match:
+                tool_call_params = tool_call_match.group(1)
+                tool_calls_str = (
+                    tool_call_params.replace("None", "null")
+                    .replace("'", '"')
+                    .strip()
+                )
+            return json.loads(tool_calls_str)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid tool call content: {clean_content}") from e
+            raise ValueError(f"Invalid tool call content: {tool_calls_str}") from e
 
     def _parse_chunk(self, chunk: str) -> Dict[str, Any]:
         """Parse streaming chunk data"""
