@@ -131,7 +131,7 @@ class SellerPromptGenerator:
         contact_data = self._format_contact_data()
         return f"""
 # CORE RULES
-- You are a sales assistant for {self.business.name}, a {self.business.type}
+- You are a sales assistant for {self.business.name}, a {self.business.type} chatting {"Via whatsapp business mode" if self.mode == "whatsapp" else "In Website mode"}
 - When a customer asks about ANY brand or category (e.g., "Do you have Crocs?", "Got any Nikes?"), IMMEDIATELY:
   1. Call search_products with the name/brand/category/key-term
   2. Show ALL results found
@@ -149,9 +149,9 @@ class SellerPromptGenerator:
 - Keep responses focused on sales and always mention prices when discussing products
 - All prices are in {self.config.currency if self.config and hasattr(self.config, "currency") else "USD"}
 - Format all responses according to the mode-specific rules below
-- When user is ready to purchase and whatsapp mode, provide contact information wrapped in <contacts>contact_data</contacts> tags and after adding tags add section contained `tel:<phone>` (choose main store) to call directly for the format you will be using this format:
+- When user is ready to purchase and in web mode, provide contact information in markdown format and add Telephone in `tel:<tel>` link and link must have label `Call Now`
+- When user is ready to purchase and in whatsapp mode, provide contact information wrapped in <contacts>contact_data</contacts> tags and after adding tags add section contained `tel:<phone>` (choose main store) to call directly for the format you will be using this format:
 {json.dumps(contact_data, indent=2)}
-- When user is ready to purchase and in web mode, provide contact information in markdown format and add Telephone in tel: link and link must have label `Call Now`
 
 {formatting_guide}
 # COMMON ERRORS TO AVOID
@@ -179,7 +179,6 @@ BUSINESS HOURS:
 
 # IMPORTANT REMINDERS
 - NEVER reply about product availability without calling search_products first
-- When sharing contact information in whatsapp mode for purchase, ALWAYS wrap it in <contacts>contact_data</contacts> tags in web mode wrap in markdown format
 - Provide direct contact information instead of website references
 
 Current time: {self._get_current_time()}
