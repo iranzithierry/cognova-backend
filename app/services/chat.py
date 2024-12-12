@@ -172,7 +172,7 @@ class ChatService:
         if "error" in data:
             try:
                 logger().error(
-                    f"Error formatting stream data: {data["error"]}", exc_info=True
+                    f"Error formatting stream data: {str(data["error"])}", exc_info=True
                 )
             except:
                 logger().error(f"Error formatting stream data: {data}", exc_info=True)
