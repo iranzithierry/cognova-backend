@@ -74,6 +74,7 @@ class CloudflareProvider(ChatProvider):
         )
         prompt = f"""You are a helpful AI assistant. Use ONLY the provided business context and conversation history to generate 3 natural follow-up questions that a customer would ask. The questions must be strictly based on information present in the business details and previous conversation.
 
+Note: For languages other than English or French, return an empty string.
 IMPORTANT: Do not generate questions about features, services, or policies (like promotions, discounts, delivery options, payment methods) unless they are explicitly mentioned in the business context.
 
 Business Context:
