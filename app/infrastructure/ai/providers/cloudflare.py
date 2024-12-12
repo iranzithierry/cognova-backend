@@ -6,8 +6,10 @@ from app.domain.interfaces import (
     Completion,
 )
 from . import ChatProvider
-from typing import List, Dict, Any, AsyncGenerator, Optional
-from app.domain.errors import StreamProcessingError, ToolProcessingError
+from app.api.dependencies import logger
+from app.domain.interfaces import Message
+from typing import List, Dict, Any, AsyncGenerator
+from app.domain.errors import StreamProcessingError
 
 
 class CloudflareProvider(ChatProvider):
@@ -63,3 +65,51 @@ class CloudflareProvider(ChatProvider):
             error_msg = f"Stream processing failed: {str(e)}"
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
             raise StreamProcessingError(error_msg)
+
+    async def generate_suggestions(
+        self, conversation_history: List[Message], business_system_prompt: str
+    ) -> List[str]:
+        formatted_history = "\n".join(
+            [f"{msg.role}: {msg.content}" for msg in conversation_history[-4:]]
+        )
+        prompt = f"""You are a helpful AI assistant. Use ONLY the provided business context and conversation history to generate 3 natural follow-up questions that a customer would ask. The questions must be strictly based on information present in the business details and previous conversation.
+
+IMPORTANT: Do not generate questions about features, services, or policies (like promotions, discounts, delivery options, payment methods) unless they are explicitly mentioned in the business context.
+
+Business Context:
+{business_system_prompt}
+
+Conversation history:
+{formatted_history}
+
+Generate only customer questions, one per line, without any numbering or additional text. The questions should be specific to this business and conversation. Focus on:
+- Questions about products or services explicitly mentioned
+- Questions about business hours or locations provided
+- Questions seeking clarification about information already discussed
+
+Only generate questions that can be answered using the provided business context."""
+
+        messages = [
+            {"role": "system", "content": prompt},
+        ]
+        suggestions_str = ""
+        async for chunk in self.request(
+            messages=messages,
+        ):
+            chunk_data = self._parse_chunk(chunk=chunk)
+            if "token" in chunk_data:
+                suggestions_str += chunk_data["token"]
+
+        suggestions = [q.strip() for q in suggestions_str.replace("<|im_end|>", "").replace("-", "").split("\n") if q.strip()][
+            :3
+        ]
+        return suggestions
+
+    def _parse_chunk(self, chunk: str) -> Dict[str, Any]:
+        """Parse streaming chunk data"""
+        try:
+            if chunk.startswith("data: "):
+                chunk = chunk[6:]
+            return json.loads(chunk)
+        except json.JSONDecodeError:
+            return {"token": chunk}

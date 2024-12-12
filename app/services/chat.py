@@ -1,9 +1,6 @@
 import re
 import json
-from dataclasses import dataclass
-from enum import Enum
 from openai import OpenAI
-from prisma.enums import BotTypes
 from prisma.models import Bot, Chat
 from app.domain.requests import ChatRequest
 from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
@@ -15,6 +12,7 @@ from app.infrastructure.ai.tools.pydantic_tools.business import (
 from app.api.dependencies import (
     get_chat_repository,
     get_business_repository,
+    logger,
 )
 from app.infrastructure.ai.providers.cloudflare import CloudflareProvider
 from app.infrastructure.ai.providers.openai import OpenAIProvider
@@ -33,6 +31,7 @@ class ChatService:
         self._recursion_count = 0
         self.chat_request: ChatRequest = None
         self.business_functions: BusinessFunctions = None
+        self.business_system_prompt = ""
 
     async def _get_prompt_generator(self, bot: Bot) -> tuple[str, Any]:
         """Get appropriate prompt generator based on bot type"""
@@ -45,7 +44,8 @@ class ChatService:
                 operating_hours=business_data.operatingHours,
                 mode=self.chat_request.chat_mode,
             )
-            return generator.generate_prompt(), business_data
+            self.business_system_prompt = generator.generate_prompt()
+            return self.business_system_prompt, business_data
 
     async def prepare_chat_context(
         self, bot: Bot, conversation_history: List[Chat]
@@ -92,7 +92,7 @@ class ChatService:
             if result in ([], None, "", "[]"):
                 result = f"No results found."
 
-            print("EXECUTED TOOL: ", tool_call.name, "WITH: ", tool_call.arguments)
+            logger().info(f"EXECUTED TOOL: {str(tool_call)}")
 
             tool_id = generate_cuid()
             await self._save_message(
@@ -134,7 +134,7 @@ class ChatService:
             )
 
         except Exception as e:
-            print(f"Error saving message: {str(e)}")
+            logger().error(f"Error saving message: {str(e)}", exc_info=True)
             return None
 
     async def _handle_tool_response(
@@ -154,7 +154,11 @@ class ChatService:
             self._recursion_count += 1
             await self.handle_tool_call(ToolCall.from_dict(tool_call), conversation_id)
             async for response in self.handle_chat(
-                bot, conversation_id, prompt="", chat_request=self.chat_request
+                bot,
+                conversation_id,
+                prompt="",
+                chat_request=self.chat_request,
+                inside=True,
             ):
                 yield response
 
@@ -167,11 +171,16 @@ class ChatService:
         """Format data for streaming"""
         if "error" in data:
             try:
-                print("ERROR:", data["error"])
+                logger().error(
+                    f"Error formatting stream data: {data["error"]}", exc_info=True
+                )
             except:
-                print("ERROR:", data)
+                logger().error(f"Error formatting stream data: {data}", exc_info=True)
                 pass
         return f"data: {json.dumps(data)}\n\n"
+
+    def send_action(self, action: str):
+        return self._stream_data({"action": action})
 
     async def handle_chat(
         self,
@@ -179,6 +188,7 @@ class ChatService:
         conversation_id: str,
         prompt: str,
         chat_request: ChatRequest = None,
+        inside: bool = False,
     ) -> AsyncGenerator[str, None]:
         """Main chat handling method"""
         user_message = None
@@ -196,7 +206,7 @@ class ChatService:
             messages = await self.prepare_chat_context(bot, history)
 
             chat_params = {}
-            if  bot.businessId:
+            if bot.businessId:
                 self.business_functions = BusinessFunctions(bot.businessId)
                 chat_params.update(
                     {
@@ -211,6 +221,8 @@ class ChatService:
                 base_url=bot.model.aiProvider.endpointUrl,
                 api_key=bot.model.aiProvider.apiKey,
             )
+            if not inside:
+                yield self.send_action("thinking")
             if bot.model.aiProvider.provider == "cloudflare":
                 chat_provider = CloudflareProvider(self.client, bot.model.name)
             elif bot.model.aiProvider.provider == "openai":
@@ -233,18 +245,23 @@ class ChatService:
                     token: str = chunk_data["token"].replace("<|im_end|>", "")
                     if token.count("tool_call") == 2:
                         is_collecting_tool_call = True
-                    elif (token.strip().startswith("<") and len(assistant_message) < 2 and token.count("tool_call>") != 2):
+                        yield self.send_action("checking-inventory")
+
+                    elif (
+                        token.strip().startswith("<")
+                        and len(assistant_message) < 2
+                        and token.count("tool_call>") != 2
+                    ):
                         is_collecting_tool_call = True
                         assistant_message += token
+                        yield self.send_action("checking-inventory")
                         continue
 
                     if is_collecting_tool_call:
                         assistant_message += token
                         if "</tool_call>" in assistant_message:
                             is_collecting_tool_call = False
-                            tool_call = self._accumulate_tool_call(
-                                assistant_message
-                            )
+                            tool_call = self._accumulate_tool_call(assistant_message)
                             async for response in self._handle_tool_response(
                                 bot, conversation_id, tool_call
                             ):
@@ -262,14 +279,12 @@ class ChatService:
                         content=assistant_message,
                     ),
                 )
-
                 if assistant_chat:
-                    yield self._stream_data(
-                        {
-                            "complete": True,
-                            "question_suggestions": [],
-                        }
+                    yield self._stream_data({"complete": True})
+                    suggestions = await self._generate_question_suggestions(
+                        bot, conversation_id
                     )
+                    yield self._stream_data({"suggestions": suggestions})
 
         except Exception as e:
             yield self._stream_data({"error": f"Error processing chat: {str(e)}"})
@@ -284,9 +299,7 @@ class ChatService:
             if tool_call_match:
                 tool_call_params = tool_call_match.group(1)
                 tool_calls_str = (
-                    tool_call_params.replace("None", "null")
-                    .replace("'", '"')
-                    .strip()
+                    tool_call_params.replace("None", "null").replace("'", '"').strip()
                 )
             return json.loads(tool_calls_str)
         except json.JSONDecodeError as e:
@@ -300,3 +313,37 @@ class ChatService:
             return json.loads(chunk)
         except json.JSONDecodeError:
             return {"token": chunk}
+
+    async def _generate_question_suggestions(
+        self, bot: Bot, conversation_id: str
+    ) -> List[str]:
+        """Generate question suggestions based on conversation history"""
+        try:
+            recent_chats = await self.chat_repo.get_recent_chats(conversation_id, 4)
+            if not recent_chats:
+                return []
+
+            messages = [
+                Message(
+                    role=chat.role,
+                    content=chat.content,
+                    toolCalls=chat.toolCalls,
+                    toolCallId=chat.toolCallId,
+                )
+                for chat in recent_chats
+            ]
+
+            cf_provider = CloudflareProvider(
+                OpenAI(
+                    base_url="https://generative.ai.cognova.io",
+                    api_key="sk-no-key-requireda",
+                ),
+                "@hf/nousresearch/hermes-2-pro-mistral-7b",
+            )
+            suggestions = await cf_provider.generate_suggestions(messages, self.business_system_prompt)
+
+            return suggestions
+
+        except Exception as e:
+            logger().error(f"Error generating suggestions: {str(e)}")
+            return []

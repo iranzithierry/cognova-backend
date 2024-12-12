@@ -12,3 +12,6 @@ class ToolExecutionError(Exception):
     """Custom exception for tool execution failures"""
 
     pass
+class ClientDisconnectError(Exception):
+    """Raised when client disconnects during streaming"""
+    pass

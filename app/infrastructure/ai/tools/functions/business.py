@@ -20,9 +20,7 @@ class BusinessFunctions:
                 "isActive": True,
             }
         else:
-            # Simplified query formatting - don't split camel case to avoid breaking product names
             formatted_query = " | ".join(f"{word}:*" for word in query.lower().split())
-            print("SEARCHING QUERY", formatted_query)
             where = {
                 "OR": [
                     {"name": {"search": formatted_query}},

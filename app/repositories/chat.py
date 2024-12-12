@@ -45,6 +45,20 @@ class ChatRepository:
             await self.db.chat.delete(where={"id": chat_id})
         except Exception as e:
             raise PrismaExecutionError(f"Failed to delete chat: {str(e)}")
+        
+    async def delete_latest_message(self, conversationId: str, role: str = None):
+        try:
+            where = {"conversationId": conversationId}
+            if role:
+                where["role"] = role
+            latest_message = await self.db.chat.find_first(
+                where=where,
+                order={"createdAt": "desc"}
+            )
+            if latest_message:
+                await self.db.chat.delete(where={"id": latest_message.id})
+        except Exception as e:
+            raise PrismaExecutionError(f"Failed to delete latest message: {str(e)}")
 
     async def get_conversation(self, conversation_id: str):
         try:

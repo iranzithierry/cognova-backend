@@ -1,6 +1,7 @@
 import re
 import datetime
 from cuid2 import Cuid
+from fastapi import Request
 
 def compress_text(text: str):
     return " ".join(text.split())
@@ -38,6 +39,17 @@ def is_positive_integer(value):
         num = int(value)
         return num > 0
     except (ValueError, TypeError):
+        return False
+
+from fastapi import Request
+
+async def is_disconnected(request: Request) -> bool:
+    """Check if the client has disconnected"""
+    try:
+        # Try to get client disconnection state
+        return await request.is_disconnected()
+    except:
+        # If we can't determine the state, assume connected
         return False
     
 def now():

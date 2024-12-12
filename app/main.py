@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 from app.api.routes import chat as chats_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
+from app.core.logging import setup_logging
 
+# Setup logging at application startup
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -12,11 +15,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     try:
+        logger.info("Starting up application...")
         await db.connect()
+        logger.info("Database connected successfully")
         yield
     finally:
         # Shutdown
+        logger.info("Shutting down application...")
         await db.disconnect()
+        logger.info("Database disconnected successfully")
 
 
 app = FastAPI(

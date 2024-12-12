@@ -163,3 +163,7 @@ cython_debug/
 
 node_modules/
 .env.production
+
+# Logs
+logs/
+*.log
