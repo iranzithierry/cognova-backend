@@ -320,7 +320,7 @@ class ChatService:
         """Generate question suggestions based on conversation history"""
         try:
             recent_chats = await self.chat_repo.get_recent_chats(conversation_id, 4)
-            if not recent_chats:
+            if not recent_chats or len(recent_chats) <= 3:
                 return []
 
             messages = [
