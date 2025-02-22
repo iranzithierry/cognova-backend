@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from app.core.logging import setup_logging
 
-# Setup logging at application startup
 setup_logging()
 logger = logging.getLogger(__name__)
 
