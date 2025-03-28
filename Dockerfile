@@ -15,8 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Generating Prisma ORM
 RUN prisma generate
 
-# Fix Prisma import issue (adjust path for Linux)
-RUN sed -i.bak "s/'models\./'/" ./venv/lib/python3.*/site-packages/prisma/models.py || true
+# Fix Prisma import issue
+
+# RUN sed -i.bak "s/'models\./'/" ./venv/lib/python3.*/site-packages/prisma/models.py || true
+RUN sed -i.bak "s/'models\./'/" ./../usr/local/lib/python3.11/site-packages/prisma/models.py || true
 
 # Expose port
 EXPOSE 8090
