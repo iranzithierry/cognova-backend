@@ -7,7 +7,7 @@ COPY . /app
 RUN python3 -m venv venv
 
 # Activating virtual environment
-RUN source venv/bin/activate
+RUN . venv/bin/activate
 
 # Install project dependencies inside the virtual environment
 RUN pip install --no-cache-dir -r requirements.txt
