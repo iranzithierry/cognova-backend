@@ -3,8 +3,14 @@ FROM python:3.11
 # Create a virtual environment and activate it
 RUN python3 -m venv venv
 
+RUN ls
+RUN pwd
+
 # Activating virtual environment
 RUN . venv/bin/activate
+
+RUN ls
+RUN pwd
 
 # Install project dependencies inside the virtual environment
 RUN pip install --no-cache-dir -r requirements.txt
